@@ -12,5 +12,5 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'MultiLoader'
+rootProject.name = 'Minify'
 include("Common", "Fabric", "Forge")

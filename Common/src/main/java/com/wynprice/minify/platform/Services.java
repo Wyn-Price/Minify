@@ -1,7 +1,7 @@
-package com.example.examplemod.platform;
+package com.wynprice.minify.platform;
 
-import com.example.examplemod.Constants;
-import com.example.examplemod.platform.services.IPlatformHelper;
+import com.wynprice.minify.Constants;
+import com.wynprice.minify.platform.services.IPlatformHelper;
 
 import java.util.ServiceLoader;
 
