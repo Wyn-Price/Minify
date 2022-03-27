@@ -1,0 +1,6 @@
+{
+  "type": "minify:data_world",
+  "generator": {
+    "type": "minify:empty"
+  }
+}
