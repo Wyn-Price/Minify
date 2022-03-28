@@ -2,10 +2,12 @@
     "required": true,
     "minVersion": "0.8",
     "package": "com.wynprice.minify.mixin",
-    "compatibilityLevel": "JAVA_16",
+    "compatibilityLevel": "JAVA_17",
     "mixins": [
+        "MixinLevel"
     ],
     "client": [
+        "MixinClientLevel"
     ],
     "injectors": {
       "defaultRequire": 1

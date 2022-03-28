@@ -1,5 +1,17 @@
 package com.wynprice.minify.platform.services;
 
+import com.mojang.datafixers.types.Type;
+import com.wynprice.minify.blocks.entity.MinifyBlockEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import org.apache.commons.lang3.function.TriFunction;
+
+import java.util.function.BiFunction;
+import java.util.function.Function;
+
 public interface IPlatformHelper {
 
     /**
@@ -23,4 +35,8 @@ public interface IPlatformHelper {
      * @return True if in a development environment, false otherwise.
      */
     boolean isDevelopmentEnvironment();
+
+
+
+    <T extends BlockEntity> Function<Type<?>, BlockEntityType<T>> createBlockEntity(BiFunction<BlockPos, BlockState, T> function, Block... blocks);
 }

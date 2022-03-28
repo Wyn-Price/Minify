@@ -9,12 +9,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MinifyBlocks {
-    public static final List<Registered<Block>> BLOCKS = new ArrayList<>();
+    private static final List<Registered<Block>> BLOCKS = new ArrayList<>();
 
     public static final MinificationBlock MINIFICATION_BLOCK = create("minification_block", new MinificationBlock(BlockBehaviour.Properties.of(Material.METAL)));
 
     private static <T extends Block> T create(String name, T object) {
         BLOCKS.add(new Registered<>(object, name));
         return object;
+    }
+
+    public static List<Registered<Block>> getBlocks() {
+        return BLOCKS;
     }
 }

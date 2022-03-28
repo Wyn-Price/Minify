@@ -1,17 +1,20 @@
 package com.wynprice.minify.blocks;
 
 import com.sun.jna.platform.win32.OaIdl;
+import com.wynprice.minify.blocks.entity.MinifyBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 
-public class MinificationBlock extends Block {
+public class MinificationBlock extends BaseEntityBlock {
     public MinificationBlock(Properties properties) {
         super(properties);
     }
@@ -22,5 +25,11 @@ public class MinificationBlock extends Block {
 
         }
         return InteractionResult.PASS;
+    }
+
+
+    @Override
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return new MinifyBlockEntity(pos, state);
     }
 }
