@@ -11,24 +11,23 @@ import java.util.List;
 public class MinifyBlocks {
     private static final List<Registered<Block>> BLOCKS = new ArrayList<>();
 
-    public static final MinificationSourceBlock MINIFICATION_BLOCK = create(
-        "minification_source_block",
+    public static final MinificationSourceBlock MINIFY_SOURCE = create(
+        "minify_source",
         new MinificationSourceBlock(BlockBehaviour.Properties.of(Material.METAL))
     );
 
 
-    public static final MinificationViewerBlock MINIFICATION_VIEWER_BLOCK = create(
-        "minification_viewer_block",
-        new MinificationViewerBlock(BlockBehaviour.Properties.of(Material.METAL))
+    public static final MinificationViewerBlock MINIFY_VIEWER = create(
+        "minify_viewer",
+        new MinificationViewerBlock(BlockBehaviour.Properties.of(Material.METAL).noOcclusion())
     );
 
-    public static final WallRedstoneBlock WALL_REDSTONE_BLOCK = create(
-        "wall_redstone_block",
+    public static final WallRedstoneBlock MINIFY_CHUNK_WALL = create(
+        "minify_chunk_wall",
         new WallRedstoneBlock(
             BlockBehaviour.Properties.of(Material.BARRIER)
                 .strength(-1.0F, 3600000.8F)
                 .noDrops()
-                .noOcclusion()
                 .isValidSpawn((var1, var2, var3, var4) -> false)
         )
     );

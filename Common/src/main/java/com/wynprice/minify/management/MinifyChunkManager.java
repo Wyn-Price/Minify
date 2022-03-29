@@ -1,8 +1,6 @@
 package com.wynprice.minify.management;
 
 import com.wynprice.minify.Constants;
-import com.wynprice.minify.blocks.MinificationSourceBlock;
-import com.wynprice.minify.blocks.MinificationViewerBlock;
 import com.wynprice.minify.blocks.MinifyBlocks;
 import com.wynprice.minify.blocks.WallRedstoneBlock;
 import com.wynprice.minify.blocks.entity.MinifySourceBlockEntity;
@@ -14,10 +12,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
-import net.minecraft.server.WorldStem;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -174,7 +170,7 @@ public class MinifyChunkManager extends SavedData {
         for (Direction dir : Direction.values()) {
             int level = this.level.getSignal(pos.relative(dir), dir);
             for (BlockPos blockPos : getAllBlocksForSide(dir)) {
-                dimension.setBlock(start.offset(blockPos), MinifyBlocks.WALL_REDSTONE_BLOCK.defaultBlockState().setValue(WallRedstoneBlock.LEVEL, useRedstoneLevels ? level : 0), 3);
+                dimension.setBlock(start.offset(blockPos), MinifyBlocks.MINIFY_CHUNK_WALL.defaultBlockState().setValue(WallRedstoneBlock.LEVEL, useRedstoneLevels ? level : 0), 3);
             }
         }
 
@@ -198,7 +194,7 @@ public class MinifyChunkManager extends SavedData {
             maxSignal = Math.max(maxSignal, signal);
 
             BlockState blockState = this.level.getBlockState(pos.offset(start));
-            if(blockState.getBlock() == MinifyBlocks.WALL_REDSTONE_BLOCK) {
+            if(blockState.getBlock() == MinifyBlocks.MINIFY_CHUNK_WALL) {
                 wallSignal = Math.max(wallSignal, blockState.getValue(WallRedstoneBlock.LEVEL));
             }
         }

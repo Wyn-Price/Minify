@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "minify:block/minify_source" }
+  }
+}

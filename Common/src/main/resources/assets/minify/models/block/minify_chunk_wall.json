@@ -1,0 +1,6 @@
+{
+  "parent": "block/cube_all",
+  "textures": {
+    "all": "minify:block/minify_chunk_wall"
+  }
+}

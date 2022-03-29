@@ -15,10 +15,10 @@ import java.util.List;
 public class MinifyItems {
     private static final List<Registered<Item>> ITEMS = new ArrayList<>();
 
-    public static final BlockItem MINIFICATION_BLOCK = createFromBlock(MinifyBlocks.MINIFICATION_BLOCK, null);
-    public static final BlockItem MINIFICATION_VIEWER_BLOCK = createFromBlock(MinifyBlocks.MINIFICATION_VIEWER_BLOCK, null);
-    public static final BlockItem WALL_REDSTONE_BLOCK = createFromBlock(MinifyBlocks.WALL_REDSTONE_BLOCK, null);
-    public static final ItemSourceTransfer ITEM_SOURCE_TRANSFER = create("item_source_transfer", new ItemSourceTransfer(new Item.Properties()));
+    public static final BlockItem MINIFY_SOURCE = createFromBlock(MinifyBlocks.MINIFY_SOURCE, CreativeTabHolder.TAB);
+    public static final BlockItem MINIFY_VIEWER = createFromBlock(MinifyBlocks.MINIFY_VIEWER, CreativeTabHolder.TAB);
+    public static final BlockItem REDSTONE_WALL = createFromBlock(MinifyBlocks.MINIFY_CHUNK_WALL, CreativeTabHolder.TAB);
+    public static final ItemSourceTransfer ITEM_SOURCE_TRANSFER = create("source_transfer", new ItemSourceTransfer(new Item.Properties().tab(CreativeTabHolder.TAB)));
 
     private static BlockItem createFromBlock(Block block, CreativeModeTab tab) {
         ResourceLocation key = Registry.BLOCK.getKey(block);
