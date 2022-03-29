@@ -16,7 +16,7 @@ public class MinifyItems {
     private static final List<Registered<Item>> ITEMS = new ArrayList<>();
 
     public static final BlockItem MINIFICATION_BLOCK = createFromBlock(MinifyBlocks.MINIFICATION_BLOCK, null);
-//    public static final BlockItem MINIFICATION_BLOCK = createFromBlock(MinifyBlocks.MINIFICATION_BLOCK, null);
+    public static final BlockItem MINIFICATION_VIEWER_BLOCK = createFromBlock(MinifyBlocks.MINIFICATION_VIEWER_BLOCK, null);
     public static final BlockItem WALL_REDSTONE_BLOCK = createFromBlock(MinifyBlocks.WALL_REDSTONE_BLOCK, null);
     public static final ItemSourceTransfer ITEM_SOURCE_TRANSFER = create("item_source_transfer", new ItemSourceTransfer(new Item.Properties()));
 
