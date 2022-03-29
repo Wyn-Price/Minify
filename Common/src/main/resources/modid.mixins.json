@@ -4,7 +4,8 @@
     "package": "com.wynprice.minify.mixin",
     "compatibilityLevel": "JAVA_17",
     "mixins": [
-        "MixinLevel"
+        "MixinLevel",
+        "MixinLevelChunk"
     ],
     "client": [
         "MixinClientLevel"

@@ -4,6 +4,7 @@ import com.wynprice.minify.blocks.MinifyBlocks;
 import com.wynprice.minify.blocks.entity.MinifyBlockEntityTypes;
 import com.wynprice.minify.generation.DimensionRegistry;
 import com.wynprice.minify.generation.EmptyChunkGenerator;
+import com.wynprice.minify.items.MinifyItems;
 import com.wynprice.minify.util.Registered;
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.core.DefaultedRegistry;
@@ -22,6 +23,7 @@ public class Minify implements ModInitializer {
 
         register(Registry.BLOCK, MinifyBlocks::getBlocks);
         register(Registry.BLOCK_ENTITY_TYPE, MinifyBlockEntityTypes::getTypes);
+        register(Registry.ITEM, MinifyItems::getItems);
 
         DimensionRegistry.register();
     }

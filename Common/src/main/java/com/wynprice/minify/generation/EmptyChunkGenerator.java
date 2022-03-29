@@ -9,6 +9,7 @@ import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.NoiseColumn;
 import net.minecraft.world.level.StructureFeatureManager;
+import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.biome.*;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -102,4 +103,11 @@ public class EmptyChunkGenerator extends ChunkGenerator {
     public void addDebugScreenInfo(List<String> var1, BlockPos var2) {
 
     }
+
+    @Override
+    public void applyBiomeDecoration(WorldGenLevel $$0, ChunkAccess $$1, StructureFeatureManager $$2) {
+
+    }
+
+
 }

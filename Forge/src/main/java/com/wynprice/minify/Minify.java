@@ -4,9 +4,11 @@ import com.wynprice.minify.blocks.MinifyBlocks;
 import com.wynprice.minify.blocks.entity.MinifyBlockEntityTypes;
 import com.wynprice.minify.generation.DimensionRegistry;
 import com.wynprice.minify.generation.EmptyChunkGenerator;
+import com.wynprice.minify.items.MinifyItems;
 import com.wynprice.minify.util.Registered;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.event.RegistryEvent;
@@ -31,6 +33,7 @@ public class Minify {
 
         register(modEventBus, Block.class, MinifyBlocks::getBlocks);
         register(modEventBus, (Class<BlockEntityType<?>>) (Object) BlockEntityType.class, MinifyBlockEntityTypes::getTypes);
+        register(modEventBus, Item.class, MinifyItems::getItems);
 
         modEventBus.addListener(Minify::init);
     }
