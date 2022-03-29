@@ -29,6 +29,7 @@ import java.util.Map;
 public class MinifyChunkManager extends SavedData {
 
     public static ThreadLocal<Boolean> isSilentlyPlacingIntoWorld = ThreadLocal.withInitial(() -> false);
+    public static ThreadLocal<Boolean> isPlacingWall = ThreadLocal.withInitial(() -> false);
 
     private final ServerLevel level;
     //TODO: Instead of keeping track of ALL the locations -> blockpos here,
@@ -57,22 +58,26 @@ public class MinifyChunkManager extends SavedData {
         this.sources.put(key, pos);
         this.updateRedstoneWall(key, pos, false);
         this.onLoad(key);
+        this.setDirty();
     }
 
     public void onUnloadSource(MinifyLocationKey key) {
         this.sources.remove(key);
         this.onUnload(key);
+        this.setDirty();
     }
 
     public void setViewerLocation(MinifyLocationKey key, BlockPos pos) {
         this.viewers.put(key, pos);
         this.updateRedstoneWall(key, pos, true);
         this.onLoad(key);
+        this.setDirty();
     }
 
     public void onUnloadViewer(MinifyLocationKey key) {
         this.viewers.remove(key);
         this.onUnload(key);
+        this.setDirty();
     }
 
     private void onLoad(MinifyLocationKey key) {
@@ -105,8 +110,24 @@ public class MinifyChunkManager extends SavedData {
 
 
     public void onBlockChangedAt(BlockPos pos, BlockState state) {
+        //TODO: threadlocal boolean to test if the blocks have changed at all.
         if(DimensionRegistry.WORLD_KEY.equals(this.level.dimension())) {
             //Update clients
+            ChunkPos chunkPos = new ChunkPos(pos);
+            int chunkY = pos.getY() >> 4;
+
+            int innerX = pos.getX() & 15;
+            int innerY = pos.getY() & 15;
+            int innerZ = pos.getZ() & 15;
+
+            boolean isInRange = innerX >= 1 && innerY >= 1 && innerZ >= 1 && innerX <= 8 && innerY <= 8 && innerZ <= 8;
+            MinifyLocationKey key = new MinifyLocationKey(chunkPos, chunkY);
+
+            if(isInRange) {
+                for (Direction value : Direction.values()) {
+                    this.updateViewerSignal(key, value);
+                }
+            }
         } else {
             this.updateSource(pos, state);
         }
@@ -147,36 +168,95 @@ public class MinifyChunkManager extends SavedData {
 
         BlockPos start = key.chunk().getBlockAt(0, key.yChunk() * 16, 0);
 
-        int max = 9;
+        isPlacingWall.set(true);
+
 
         for (Direction dir : Direction.values()) {
             int level = this.level.getSignal(pos.relative(dir), dir);
-
-            //We need to set the blocks in the given plane now.
-            //The planes start at 0,0,0, and end at 9,9,9 (inc), as the inner area is a 8x8x8 block.
-            //
-            //-x    0,0,0 -> 0,1,1  west
-            //+x    1,0,0 -> 1,1,1  east
-            //-y    0,0,0 -> 1,0,1  down
-            //+y    0,1,0 -> 1,1,1  up
-            //-z    0,0,0 -> 1,1,0  north
-            //+z    0,0,1 -> 1,1,1  south
-
-            int fromX = dir == Direction.EAST ? max : 0;
-            int toX = dir == Direction.WEST ? 0 : max;
-
-            int fromY = dir == Direction.UP ? max : 0;
-            int toY = dir == Direction.DOWN ? 0 : max;
-
-            int fromZ = dir == Direction.SOUTH ? max : 0;
-            int toZ = dir == Direction.NORTH ? 0 : max;
-
-            for (BlockPos blockPos : BlockPos.betweenClosed(fromX, fromY, fromZ, toX, toY, toZ)) {
+            for (BlockPos blockPos : getAllBlocksForSide(dir)) {
                 dimension.setBlock(start.offset(blockPos), MinifyBlocks.WALL_REDSTONE_BLOCK.defaultBlockState().setValue(WallRedstoneBlock.LEVEL, useRedstoneLevels ? level : 0), 3);
             }
-
-
         }
+
+        isPlacingWall.set(false);
+    }
+
+
+    public void updateViewerSignal(MinifyLocationKey key, Direction direction) {
+        //this.level is the data world
+        MinifyViewerBlockEntity blockEntity = this.findViewerForKey(key);
+        if(blockEntity == null) {
+            return;
+        }
+
+        BlockPos start = key.chunk().getBlockAt(0, key.yChunk() * 16, 0);
+
+        int maxSignal = 0;
+        int wallSignal = 0;
+        for (BlockPos pos : getAllBlocksForSide(direction.getOpposite())) {
+            int signal = this.level.getSignal(pos.offset(start).relative(direction), direction.getOpposite());
+            maxSignal = Math.max(maxSignal, signal);
+
+            BlockState blockState = this.level.getBlockState(pos.offset(start));
+            if(blockState.getBlock() == MinifyBlocks.WALL_REDSTONE_BLOCK) {
+                wallSignal = Math.max(wallSignal, blockState.getValue(WallRedstoneBlock.LEVEL));
+            }
+        }
+
+        blockEntity.setSignal(direction, wallSignal >= maxSignal ? 0 : maxSignal);
+    }
+
+    //TODO: A better way to doing this
+    private MinifyViewerBlockEntity findViewerForKey(MinifyLocationKey key) {
+        for (ServerLevel serverLevel : this.level.getServer().getAllLevels()) {
+            MinifyChunkManager manager = getManager(serverLevel);
+            if(manager.viewers.containsKey(key)) {
+                BlockEntity entity = serverLevel.getBlockEntity(manager.viewers.get(key));
+                if(entity instanceof MinifyViewerBlockEntity be) {
+                    return be;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Iterable<BlockPos> getAllBlocksForSide(Direction dir) {
+        int max = 9;
+
+        //We need to set the blocks in the given plane now.
+        //The planes start at 0,0,0, and end at 9,9,9 (inc), as the inner area is a 8x8x8 block.
+        //
+        //-x    0,0,0 -> 0,1,1  west
+        //+x    1,0,0 -> 1,1,1  east
+        //-y    0,0,0 -> 1,0,1  down
+        //+y    0,1,0 -> 1,1,1  up
+        //-z    0,0,0 -> 1,1,0  north
+        //+z    0,0,1 -> 1,1,1  south
+
+        int fromX = dir == Direction.EAST ? max : 0;
+        int toX = dir == Direction.WEST ? 0 : max;
+
+        int fromY = dir == Direction.UP ? max : 0;
+        int toY = dir == Direction.DOWN ? 0 : max;
+
+        int fromZ = dir == Direction.SOUTH ? max : 0;
+        int toZ = dir == Direction.NORTH ? 0 : max;
+
+        //Clip the last blocks of the edges of the axis
+        if(dir.getAxis() != Direction.Axis.X) {
+            fromX += 1;
+            toX -= 1;
+        }
+        if(dir.getAxis() != Direction.Axis.Y) {
+            fromY += 1;
+            toY -= 1;
+        }
+        if(dir.getAxis() != Direction.Axis.Z) {
+            fromZ += 1;
+            toZ -= 1;
+        }
+
+        return BlockPos.betweenClosed(fromX, fromY, fromZ, toX, toY, toZ);
     }
 
     public void sourcePlacedCopyOver(MinifyLocationKey src, MinifySourceBlockEntity blockEntity) {

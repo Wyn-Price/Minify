@@ -43,6 +43,7 @@ public class BaseMinifyBlockEntity extends BlockEntity {
         if(this.level instanceof ServerLevel) {
             if(this.locationKey == null) {
                 this.locationKey = MinifyChunkManager.getManager((ServerLevel) this.level).findNextLocation();
+                this.setChanged();
             }
             this.loadFunction.accept(MinifyChunkManager.getManager((ServerLevel) this.level), this.locationKey, this.getBlockPos());
 

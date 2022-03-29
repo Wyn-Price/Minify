@@ -15,12 +15,14 @@ public class MixinLevel {
 
     @Inject(
         method = "setBlock(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;II)Z",
-        at = @At("HEAD")
+        at = @At("RETURN")
     )
     public void setBlock(BlockPos pos, BlockState state, int flags, int recursions, CallbackInfoReturnable<Boolean> info) {
-        Level thiz = (Level) (Object) this;
-        if(thiz instanceof ServerLevel) {
-            MinifyChunkManager.getManager((ServerLevel) thiz).onBlockChangedAt(pos, state);
+        if(info.getReturnValue()) {
+            Level thiz = (Level) (Object) this;
+            if(thiz instanceof ServerLevel) {
+                MinifyChunkManager.getManager((ServerLevel) thiz).onBlockChangedAt(pos, state);
+            }
         }
     }
 }
