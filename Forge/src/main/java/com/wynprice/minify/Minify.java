@@ -2,10 +2,13 @@ package com.wynprice.minify;
 
 import com.wynprice.minify.blocks.MinifyBlocks;
 import com.wynprice.minify.blocks.entity.MinifyBlockEntityTypes;
+import com.wynprice.minify.blocks.entity.MinifyViewerBlockEntity;
+import com.wynprice.minify.client.MinifyViewerBlockEntityRenderer;
 import com.wynprice.minify.generation.DimensionRegistry;
 import com.wynprice.minify.generation.EmptyChunkGenerator;
 import com.wynprice.minify.items.CreativeTabHolder;
 import com.wynprice.minify.items.MinifyItems;
+import com.wynprice.minify.network.MinifyNetworkRegistry;
 import com.wynprice.minify.util.Registered;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
@@ -16,6 +19,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.event.RegistryEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
@@ -43,6 +47,7 @@ public class Minify {
 
         modEventBus.addListener(Minify::init);
         modEventBus.addListener(Minify::clientInit);
+        modEventBus.addListener(Minify::registerBlockEntityRenders);
 
         CreativeTabHolder.TAB = new CreativeModeTab(String.format("%s.%s", Constants.MOD_ID, "items")) {
             @Override
@@ -53,12 +58,20 @@ public class Minify {
     }
 
     private static void init(FMLCommonSetupEvent event) {
-        event.enqueueWork(DimensionRegistry::register);
+        event.enqueueWork(() -> {
+            DimensionRegistry.register();
+            MinifyNetworkRegistry.registerPackets();
+        });
+
     }
 
     private static void clientInit(FMLClientSetupEvent event) {
         ItemBlockRenderTypes.setRenderLayer(MinifyBlocks.MINIFY_CHUNK_WALL, RenderType.cutout());
         ItemBlockRenderTypes.setRenderLayer(MinifyBlocks.MINIFY_VIEWER, RenderType.cutout());
+    }
+
+    private static void registerBlockEntityRenders(EntityRenderersEvent.RegisterRenderers event) {
+        event.registerBlockEntityRenderer(MinifyBlockEntityTypes.MINIFICATION_VIEWER_BLOCK_ENTITY, MinifyViewerBlockEntityRenderer::new);
     }
 
     private <T extends IForgeRegistryEntry<T>> void register(IEventBus modEventBus, Class<T> clazz, Supplier<List<Registered<T>>> list) {

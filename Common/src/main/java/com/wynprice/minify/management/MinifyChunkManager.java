@@ -6,6 +6,8 @@ import com.wynprice.minify.blocks.WallRedstoneBlock;
 import com.wynprice.minify.blocks.entity.MinifySourceBlockEntity;
 import com.wynprice.minify.blocks.entity.MinifyViewerBlockEntity;
 import com.wynprice.minify.generation.DimensionRegistry;
+import com.wynprice.minify.network.S2CUpdateViewerData;
+import com.wynprice.minify.platform.Services;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -14,23 +16,28 @@ import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 public class MinifyChunkManager extends SavedData {
 
     public static ThreadLocal<Boolean> isSilentlyPlacingIntoWorld = ThreadLocal.withInitial(() -> false);
-    public static ThreadLocal<Boolean> isPlacingWall = ThreadLocal.withInitial(() -> false);
 
     private final ServerLevel level;
     //TODO: Instead of keeping track of ALL the locations -> blockpos here,
     //In the data world, when a chunk (16x16x16) is being used, the bottom
     //left block can be a non air block, otherwise have no blocks there.
+    //
+    //Also TODO: we don't actually need to store the sources in the data dimension,
+    //However for now it's okay, as we don't want to keep loading unloaded chunks
     private final Map<MinifyLocationKey, BlockPos> sources = new HashMap<>();
     private final Map<MinifyLocationKey, BlockPos> viewers = new HashMap<>();
 
@@ -108,7 +115,6 @@ public class MinifyChunkManager extends SavedData {
     public void onBlockChangedAt(BlockPos pos, BlockState state) {
         //TODO: threadlocal boolean to test if the blocks have changed at all.
         if(DimensionRegistry.WORLD_KEY.equals(this.level.dimension())) {
-            //Update clients
             ChunkPos chunkPos = new ChunkPos(pos);
             int chunkY = pos.getY() >> 4;
 
@@ -118,10 +124,34 @@ public class MinifyChunkManager extends SavedData {
 
             boolean isInRange = innerX >= 1 && innerY >= 1 && innerZ >= 1 && innerX <= 8 && innerY <= 8 && innerZ <= 8;
             MinifyLocationKey key = new MinifyLocationKey(chunkPos, chunkY);
-
             if(isInRange) {
+
+                //Update the viewer signals
                 for (Direction value : Direction.values()) {
                     this.updateViewerSignal(key, value);
+                }
+
+                //Update the viewer, and sync changes with clients
+                //TODO: batch the updates into one packet.
+                Optional<MinifyViewerBlockEntity> viewer = this.findViewerForKey(key);
+                if(viewer.isPresent()) {
+                    MinifyViewerBlockEntity blockEntity = viewer.get();
+                    var worldCache = blockEntity.getOrGenerateWorldCache();
+                    if(worldCache.isPresent()) {
+                        worldCache.get().set(
+                            innerX-1, innerY-1, innerZ-1, state
+                        );
+
+                        Level level = blockEntity.getLevel();
+                        //Should always be true
+                        if(level instanceof ServerLevel serverLevel) {
+                            Services.NETWORK.sendToAllAround(new S2CUpdateViewerData(
+                                blockEntity.getBlockPos(), new BlockPos(innerX-1, innerY-1, innerZ-1),
+                                state
+                            ), serverLevel, blockEntity.getBlockPos());
+                        }
+
+                    }
                 }
             }
         } else {
@@ -154,8 +184,17 @@ public class MinifyChunkManager extends SavedData {
         BlockPos srcStart = src.chunk().getBlockAt(0, src.yChunk() * 16, 0);
         BlockPos destStart = dest.chunk().getBlockAt(0, dest.yChunk() * 16, 0);
 
-        for (BlockPos offset : BlockPos.betweenClosed(BlockPos.ZERO, BlockPos.ZERO.offset(15, 15, 15))) {
+        isSilentlyPlacingIntoWorld.set(true);
+
+        for (BlockPos offset : BlockPos.betweenClosed(1, 1, 1, 8, 8, 8)) {
             dimension.setBlock(destStart.offset(offset), dimension.getBlockState(srcStart.offset(offset)), 3);
+        }
+
+        isSilentlyPlacingIntoWorld.set(false);
+
+        //Update the viewer signals
+        for (Direction value : Direction.values()) {
+            this.updateViewerSignal(dest, value);
         }
     }
 
@@ -164,24 +203,19 @@ public class MinifyChunkManager extends SavedData {
 
         BlockPos start = key.chunk().getBlockAt(0, key.yChunk() * 16, 0);
 
-        isPlacingWall.set(true);
-
-
         for (Direction dir : Direction.values()) {
             int level = this.level.getSignal(pos.relative(dir), dir);
             for (BlockPos blockPos : getAllBlocksForSide(dir)) {
                 dimension.setBlock(start.offset(blockPos), MinifyBlocks.MINIFY_CHUNK_WALL.defaultBlockState().setValue(WallRedstoneBlock.LEVEL, useRedstoneLevels ? level : 0), 3);
             }
         }
-
-        isPlacingWall.set(false);
     }
 
 
     public void updateViewerSignal(MinifyLocationKey key, Direction direction) {
         //this.level is the data world
-        MinifyViewerBlockEntity blockEntity = this.findViewerForKey(key);
-        if(blockEntity == null) {
+        Optional<MinifyViewerBlockEntity> blockEntity = this.findViewerForKey(key);
+        if(blockEntity.isEmpty()) {
             return;
         }
 
@@ -199,21 +233,21 @@ public class MinifyChunkManager extends SavedData {
             }
         }
 
-        blockEntity.setSignal(direction, wallSignal >= maxSignal ? 0 : maxSignal);
+        blockEntity.get().setSignal(direction, wallSignal >= maxSignal ? 0 : maxSignal);
     }
 
     //TODO: A better way to doing this
-    private MinifyViewerBlockEntity findViewerForKey(MinifyLocationKey key) {
+    private Optional<MinifyViewerBlockEntity> findViewerForKey(MinifyLocationKey key) {
         for (ServerLevel serverLevel : this.level.getServer().getAllLevels()) {
             MinifyChunkManager manager = getManager(serverLevel);
             if(manager.viewers.containsKey(key)) {
                 BlockEntity entity = serverLevel.getBlockEntity(manager.viewers.get(key));
                 if(entity instanceof MinifyViewerBlockEntity be) {
-                    return be;
+                    return Optional.of(be);
                 }
             }
         }
-        return null;
+        return Optional.empty();
     }
 
     private static Iterable<BlockPos> getAllBlocksForSide(Direction dir) {

@@ -8,6 +8,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 public class MinificationViewerBlock extends MinificationSourceBlock {
 
@@ -38,6 +41,21 @@ public class MinificationViewerBlock extends MinificationSourceBlock {
             return blockEntity.getSignal(direction);
         }
         return 0;
+    }
+
+    @Override
+    public VoxelShape getVisualShape(BlockState $$0, BlockGetter $$1, BlockPos $$2, CollisionContext $$3) {
+        return Shapes.empty();
+    }
+
+    @Override
+    public float getShadeBrightness(BlockState $$0, BlockGetter $$1, BlockPos $$2) {
+        return 1.0F;
+    }
+
+    @Override
+    public boolean propagatesSkylightDown(BlockState $$0, BlockGetter $$1, BlockPos $$2) {
+        return true;
     }
 
 

@@ -6,6 +6,7 @@ import com.wynprice.minify.generation.DimensionRegistry;
 import com.wynprice.minify.generation.EmptyChunkGenerator;
 import com.wynprice.minify.items.CreativeTabHolder;
 import com.wynprice.minify.items.MinifyItems;
+import com.wynprice.minify.network.MinifyNetworkRegistry;
 import com.wynprice.minify.util.Registered;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
@@ -34,6 +35,7 @@ public class Minify implements ModInitializer {
         register(Registry.ITEM, MinifyItems::getItems);
 
         DimensionRegistry.register();
+        MinifyNetworkRegistry.registerPackets();
     }
 
     
