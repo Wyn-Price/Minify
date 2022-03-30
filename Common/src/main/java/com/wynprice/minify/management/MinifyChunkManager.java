@@ -30,6 +30,7 @@ import java.util.Optional;
 public class MinifyChunkManager extends SavedData {
 
     public static ThreadLocal<Boolean> isSilentlyPlacingIntoWorld = ThreadLocal.withInitial(() -> false);
+    public static ThreadLocal<Boolean> isUpdatingRedstoneWall = ThreadLocal.withInitial(() -> false);
 
     private final ServerLevel level;
     //TODO: Instead of keeping track of ALL the locations -> blockpos here,
@@ -127,8 +128,10 @@ public class MinifyChunkManager extends SavedData {
             if(isInRange) {
 
                 //Update the viewer signals
-                for (Direction value : Direction.values()) {
-                    this.updateViewerSignal(key, value);
+                if(!isUpdatingRedstoneWall.get()) {
+                    for (Direction value : Direction.values()) {
+                        this.updateViewerSignal(key, value);
+                    }
                 }
 
                 //Update the viewer, and sync changes with clients
@@ -178,6 +181,8 @@ public class MinifyChunkManager extends SavedData {
         });
     }
 
+    //TODO: recursively copy viewers
+    //TODO: copy block entities
     public void copyTo(MinifyLocationKey src, MinifyLocationKey dest) {
         ServerLevel dimension = this.level.getServer().getLevel(DimensionRegistry.WORLD_KEY);
 
@@ -199,6 +204,8 @@ public class MinifyChunkManager extends SavedData {
     }
 
     public void updateRedstoneWall(MinifyLocationKey key, BlockPos pos, boolean useRedstoneLevels) {
+
+        isUpdatingRedstoneWall.set(true);
         ServerLevel dimension = this.level.getServer().getLevel(DimensionRegistry.WORLD_KEY);
 
         BlockPos start = key.chunk().getBlockAt(0, key.yChunk() * 16, 0);
@@ -208,6 +215,10 @@ public class MinifyChunkManager extends SavedData {
             for (BlockPos blockPos : getAllBlocksForSide(dir)) {
                 dimension.setBlock(start.offset(blockPos), MinifyBlocks.MINIFY_CHUNK_WALL.defaultBlockState().setValue(WallRedstoneBlock.LEVEL, useRedstoneLevels ? level : 0), 3);
             }
+        }
+        isUpdatingRedstoneWall.set(false);
+        for (Direction value : Direction.values()) {
+            this.updateViewerSignal(key, value);
         }
     }
 

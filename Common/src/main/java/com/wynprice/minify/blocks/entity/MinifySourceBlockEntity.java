@@ -25,6 +25,6 @@ public class MinifySourceBlockEntity extends BaseMinifyBlockEntity {
     }
 
     public final AABB getArea() {
-        return new AABB(this.getOffset(), this.getOffset().offset(7, 7, 7)); //8,8,8 box
+        return new AABB(this.getOffset(), this.getOffset().offset(8, 8, 8)); //8,8,8 box
     }
 }

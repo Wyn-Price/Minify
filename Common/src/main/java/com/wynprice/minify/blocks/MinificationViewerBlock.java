@@ -13,8 +13,7 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 public class MinificationViewerBlock extends MinificationSourceBlock {
-
-
+    
     public MinificationViewerBlock(Properties properties) {
         super(properties);
     }
@@ -22,7 +21,7 @@ public class MinificationViewerBlock extends MinificationSourceBlock {
     @Override
     public void neighborChanged(BlockState state, Level level, BlockPos pos, Block block, BlockPos posFrom, boolean var) {
         BlockEntity entity = level.getBlockEntity(pos);
-        //TODO: only update a direction, instead of everything
+
         if(entity instanceof MinifyViewerBlockEntity) {
             ((MinifyViewerBlockEntity) entity).updateRedstoneWall();
         }
