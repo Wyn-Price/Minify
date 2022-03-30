@@ -6,6 +6,15 @@ import org.slf4j.LoggerFactory;
 public class Constants {
 
 	//TODO: -fixes
+	//  Fix issue with removal of nested viewers. For some reason it causes a "leak"
+	//  Viewer should be rotated horizontally
+	//		- Simply rotate before rendering
+	//		- Reverse rotate redstone input signals
+	//		- Could possibly do any rotation needed (click on a face with an item to rotate it)
+	//  Viewer should play sounds, at a higher pitch
+	//		- Mixin head at ServerLevel#playSound (the non entity one)
+	//		- Call the playSound method again, but in the viewers dimension + position, and with a increased pitch
+	//		- Make sure the call is not infinitely recursive
 	//	Sync block entities to client
 	//		- First, add a list of block entity compound tags to the S2CSendViewerData packet
 	//		- Add a nullable block entity compound tag to the S2CUpdateViewerData packet
