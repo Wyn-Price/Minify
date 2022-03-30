@@ -29,7 +29,7 @@ public class C2SRequestViewerData {
         BlockEntity rawEntity = player.level.getBlockEntity(packet.blockPos);
         if(rawEntity instanceof MinifyViewerBlockEntity blockEntity) {
             blockEntity.getOrGenerateWorldCache().ifPresent(cache ->
-                Services.NETWORK.sendToPlayer(new S2CSendViewerData(packet.blockPos, cache), player)
+                Services.NETWORK.sendToPlayer(new S2CSendViewerData(packet.blockPos, cache, blockEntity.getBlockEntityMap()), player)
             );
         }
 

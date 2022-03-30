@@ -20,7 +20,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.PalettedContainer;
 
-import java.util.Optional;
+import java.util.*;
 
 public class MinifyViewerBlockEntity extends BlockEntity {
 
@@ -37,6 +37,9 @@ public class MinifyViewerBlockEntity extends BlockEntity {
     private PalettedContainer<BlockState> worldCache;
     private boolean hasClientRequestedData = false;
 
+    //A map of <LocalPosition, BlockEntity>. In the server, the BlockEntity will be the same object as the actual block entity.
+    private final Map<BlockPos, BlockEntity> blockEntityMap = new HashMap<>();
+
     public MinifyViewerBlockEntity(BlockPos pos, BlockState state) {
         super(MinifyBlockEntityTypes.MINIFICATION_VIEWER_BLOCK_ENTITY, pos, state);
     }
@@ -52,7 +55,7 @@ public class MinifyViewerBlockEntity extends BlockEntity {
                 this.refreshWorldCache();
             }
             this.getOrGenerateWorldCache().ifPresent(cache ->
-                Services.NETWORK.sendToAllAround(new S2CSendViewerData(this.getBlockPos(), cache), serverLevel, this.getBlockPos())
+                Services.NETWORK.sendToAllAround(new S2CSendViewerData(this.getBlockPos(), cache, this.blockEntityMap), serverLevel, this.getBlockPos())
             );
         }
     }
@@ -65,6 +68,9 @@ public class MinifyViewerBlockEntity extends BlockEntity {
         return locationKey;
     }
 
+    public Map<BlockPos, BlockEntity> getBlockEntityMap() {
+        return blockEntityMap;
+    }
 
     public void setHorizontalRotationIndex(int horizontalRotationIndex) {
         this.horizontalRotationIndex = horizontalRotationIndex;
@@ -173,6 +179,12 @@ public class MinifyViewerBlockEntity extends BlockEntity {
 
         for (BlockPos offset : BlockPos.betweenClosed(0, 0, 0, 7, 7, 7)) {
             this.worldCache.set(offset.getX(), offset.getY(), offset.getZ(), dimension.getBlockState(start.offset(offset)));
+            BlockEntity blockEntity = dimension.getBlockEntity(start.offset(offset));
+            if(blockEntity != null) {
+                this.blockEntityMap.put(offset, blockEntity);
+            } else {
+                this.blockEntityMap.remove(offset);
+            }
         }
     }
 

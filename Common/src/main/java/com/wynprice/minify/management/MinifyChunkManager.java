@@ -163,12 +163,22 @@ public class MinifyChunkManager extends SavedData {
                             innerX-1, innerY-1, innerZ-1, state
                         );
 
+                        BlockPos worldPosition = new BlockPos(innerX-1, innerY-1, innerZ-1);
+                        BlockEntity entity = this.level.getBlockEntity(pos);
+                        if(entity != null) {
+                            blockEntity.getBlockEntityMap().put(worldPosition, entity);
+                        } else {
+                            blockEntity.getBlockEntityMap().remove(worldPosition);
+                        }
+
                         Level level = blockEntity.getLevel();
                         //Should always be true
                         if(level instanceof ServerLevel serverLevel) {
+
                             Services.NETWORK.sendToAllAround(new S2CUpdateViewerData(
                                 blockEntity.getBlockPos(), new BlockPos(innerX-1, innerY-1, innerZ-1),
-                                state
+                                state,
+                                entity == null ? null : entity.saveWithFullMetadata()
                             ), serverLevel, blockEntity.getBlockPos());
                         }
 
