@@ -11,9 +11,9 @@ import java.util.List;
 public class MinifyBlocks {
     private static final List<Registered<Block>> BLOCKS = new ArrayList<>();
 
-    public static final MinificationSourceBlock MINIFY_SOURCE = create(
+    public static final Block MINIFY_SOURCE = create(
         "minify_source",
-        new MinificationSourceBlock(BlockBehaviour.Properties.of(Material.METAL))
+        new Block(BlockBehaviour.Properties.of(Material.METAL))
     );
 
 

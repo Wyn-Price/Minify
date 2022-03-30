@@ -1,19 +1,18 @@
 package com.wynprice.minify.items;
 
-import com.wynprice.minify.Constants;
-import com.wynprice.minify.blocks.entity.MinifySourceBlockEntity;
+import com.wynprice.minify.blocks.MinifyBlocks;
 import com.wynprice.minify.blocks.entity.MinifyViewerBlockEntity;
 import com.wynprice.minify.management.MinifyLocationKey;
+import com.wynprice.minify.management.MinifySourceKey;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 
 public class ItemSourceTransfer extends Item {
 
@@ -24,17 +23,20 @@ public class ItemSourceTransfer extends Item {
     @Override
     public InteractionResult useOn(UseOnContext context) {
         ItemStack inHand = context.getItemInHand();
-        BlockEntity entity = context.getLevel().getBlockEntity(context.getClickedPos());
-        if(entity instanceof MinifySourceBlockEntity) {
-            MinifyLocationKey locationKey = ((MinifySourceBlockEntity) entity).getLocationKey();
-            MinifyLocationKey.toNBT(locationKey, inHand.getOrCreateTagElement("source_location"));
+        Level level = context.getLevel();
+        BlockPos pos = context.getClickedPos();
+        BlockState state = level.getBlockState(pos);
+        if(state.getBlock() == MinifyBlocks.MINIFY_SOURCE) {
+            MinifySourceKey locationKey = new MinifySourceKey(level.dimension().location(), pos);
+            MinifySourceKey.toNBT(locationKey, inHand.getOrCreateTagElement("source_location"));
             return InteractionResult.SUCCESS;
         }
-        if(entity instanceof MinifyViewerBlockEntity) {
+        BlockEntity entity = level.getBlockEntity(pos);
+        if(entity instanceof MinifyViewerBlockEntity minifyViewerBlock) {
             CompoundTag tagElement = inHand.getTagElement("source_location");
             if(tagElement != null) {
-                MinifyLocationKey location = MinifyLocationKey.fromNBT(tagElement);
-                ((MinifyViewerBlockEntity) entity).setSourceLocationKey(location);
+                MinifySourceKey location = MinifySourceKey.fromNBT(tagElement);
+                minifyViewerBlock.setSourceLocationKey(location);
             }
             return InteractionResult.SUCCESS;
         }

@@ -3,34 +3,41 @@ package com.wynprice.minify.blocks.entity;
 import com.wynprice.minify.generation.DimensionRegistry;
 import com.wynprice.minify.management.MinifyChunkManager;
 import com.wynprice.minify.management.MinifyLocationKey;
+import com.wynprice.minify.management.MinifySourceKey;
 import com.wynprice.minify.network.C2SRequestViewerData;
 import com.wynprice.minify.network.S2CSendViewerData;
 import com.wynprice.minify.platform.Services;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.PalettedContainer;
 
 import java.util.Optional;
 
-public class MinifyViewerBlockEntity extends BaseMinifyBlockEntity {
+public class MinifyViewerBlockEntity extends BlockEntity {
 
-    private MinifyLocationKey sourceLocationKey;
+    private MinifyLocationKey locationKey;
+    private MinifySourceKey sourceLocationKey;
 
+    private boolean isUpdatingNeighbours;
     private int[] signalsInDirections = new int[Direction.values().length];
 
     private PalettedContainer<BlockState> worldCache;
     private boolean hasClientRequestedData = false;
 
     public MinifyViewerBlockEntity(BlockPos pos, BlockState state) {
-        super(MinifyBlockEntityTypes.MINIFICATION_VIEWER_BLOCK_ENTITY, pos, state, MinifyChunkManager::setViewerLocation, MinifyChunkManager::onUnloadViewer);
+        super(MinifyBlockEntityTypes.MINIFICATION_VIEWER_BLOCK_ENTITY, pos, state);
     }
 
-    public void setSourceLocationKey(MinifyLocationKey sourceLocationKey) {
+    public void setSourceLocationKey(MinifySourceKey sourceLocationKey) {
         this.sourceLocationKey = sourceLocationKey;
         this.setChanged();
         if (this.level instanceof ServerLevel serverLevel) {
@@ -41,10 +48,40 @@ public class MinifyViewerBlockEntity extends BaseMinifyBlockEntity {
         }
     }
 
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public CompoundTag getUpdateTag() {
+        return this.saveWithoutMetadata();
+    }
+
+    public void setToData() {
+        if(this.level instanceof ServerLevel serverLevel) {
+            if(this.locationKey == null) {
+                this.locationKey = MinifyChunkManager.getManager(serverLevel).findNextLocation();
+                this.setChanged();
+            }
+            MinifyChunkManager.getManager(serverLevel).setViewerLocation(this.locationKey, this.getBlockPos());
+        }
+    }
+
+    public void removeFromData() {
+        if(this.level instanceof ServerLevel serverLevel && this.locationKey != null) {
+            MinifyChunkManager.getManager(serverLevel).onUnloadViewer(this.locationKey);
+        }
+    }
+
     @Override
     protected void saveAdditional(CompoundTag tag) {
+        if(this.locationKey != null) {
+            tag.put("location_key", MinifyLocationKey.toNBT(this.locationKey, new CompoundTag()));
+        }
         if (this.sourceLocationKey != null) {
-            tag.put("source_location_key", MinifyLocationKey.toNBT(this.sourceLocationKey, new CompoundTag()));
+            tag.put("source_location_key", MinifySourceKey.toNBT(this.sourceLocationKey, new CompoundTag()));
         }
         tag.putIntArray("signal_values", this.signalsInDirections);
         super.saveAdditional(tag);
@@ -52,8 +89,11 @@ public class MinifyViewerBlockEntity extends BaseMinifyBlockEntity {
 
     @Override
     public void load(CompoundTag tag) {
-        if (tag.contains("source_location_key", 10)) {
+        if(tag.contains("location_key", 10)) {
             this.locationKey = MinifyLocationKey.fromNBT(tag.getCompound("location_key"));
+        }
+        if (tag.contains("source_location_key", 10)) {
+            this.sourceLocationKey = MinifySourceKey.fromNBT(tag.getCompound("source_location_key"));
             this.setChanged();
         }
         this.signalsInDirections = tag.getIntArray("signal_values");
@@ -76,10 +116,15 @@ public class MinifyViewerBlockEntity extends BaseMinifyBlockEntity {
     }
 
     public final void setSignal(Direction direction, int signal) {
+        if (signal == this.signalsInDirections[direction.ordinal()]) {
+            return;
+        }
         this.signalsInDirections[direction.ordinal()] = signal;
         this.setChanged();
-        if(!this.level.isClientSide) {
+        if(!this.level.isClientSide) {// && !this.isUpdatingNeighbours
+            this.isUpdatingNeighbours = true;
             this.level.updateNeighborsAt(this.getBlockPos(), this.getBlockState().getBlock());
+            this.isUpdatingNeighbours = false;
         }
     }
 
