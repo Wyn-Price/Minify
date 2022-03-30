@@ -14,14 +14,16 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Mixin(LevelChunk.class)
 public class MixinLevelChunk {
 
-    @Redirect(
-        method = "setBlockState(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;Z)Lnet/minecraft/world/level/block/state/BlockState;",
-        at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/state/BlockState;onRemove(Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;Z)V")
-    )
-    private void onlyPlaceIfNotEditing(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean drops) {
-        if(level.dimension() == DimensionRegistry.WORLD_KEY && MinifyChunkManager.isSilentlyPlacingIntoWorld.get()) {
-            return;
-        }
-        state.onRemove(level, pos, oldState, drops);
-    }
+    //This is to prevent things like redstone from breaking as the block their on changes
+    //Im not sure this actually works, as all it does is prevent the blockentity from being removed?
+//    @Redirect(
+//        method = "setBlockState(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;Z)Lnet/minecraft/world/level/block/state/BlockState;",
+//        at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/state/BlockState;onRemove(Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;Z)V")
+//    )
+//    private void onlyPlaceIfNotEditing(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean drops) {
+//        if(level.dimension() == DimensionRegistry.WORLD_KEY && MinifyChunkManager.isSilentlyPlacingIntoWorld.get()) {
+//            return;
+//        }
+//        state.onRemove(level, pos, oldState, drops);
+//    }
 }

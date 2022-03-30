@@ -24,19 +24,18 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.saveddata.SavedData;
 import org.lwjgl.system.MathUtil;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 public class MinifyChunkManager extends SavedData {
 
     public static ThreadLocal<Boolean> isSilentlyPlacingIntoWorld = ThreadLocal.withInitial(() -> false);
     public static ThreadLocal<Boolean> isUpdatingRedstoneWall = ThreadLocal.withInitial(() -> false);
 
+    public static ThreadLocal<Stack<MinifyLocationKey>> currentlyProcessedKeys = ThreadLocal.withInitial(Stack::new);
     private final ServerLevel level;
-    //TODO: Instead of keeping track of ALL the locations -> blockpos here,
-    //In the data world, when a chunk (16x16x16) is being used, the bottom
-    //left block can be a non air block, otherwise have no blocks there.
+
     private final Map<MinifyLocationKey, BlockPos> viewers = new HashMap<>();
 
     public MinifyChunkManager(ServerLevel level, CompoundTag tag) {
@@ -70,7 +69,11 @@ public class MinifyChunkManager extends SavedData {
 
     public void onUnloadViewer(MinifyLocationKey key) {
         this.viewers.remove(key);
-        this.onUnload(key);
+        boolean stillInUse = this.viewers.keySet().stream().anyMatch(k -> k.chunk().equals(key.chunk()));
+        if(!stillInUse) {
+            this.setChunkForceLoaded(key.chunk(), false);
+        }
+        this.clearChunk(key, true);
         this.setDirty();
     }
 
@@ -78,23 +81,23 @@ public class MinifyChunkManager extends SavedData {
         this.setChunkForceLoaded(key.chunk(), true);
     }
 
-    private void onUnload(MinifyLocationKey key) {
-        boolean stillInUse = this.viewers.keySet().stream().anyMatch(k -> k.chunk().equals(key.chunk()));
-        if(!stillInUse) {
-            this.setChunkForceLoaded(key.chunk(), false);
-        }
-        this.clearChunk(key);
-    }
-
-    private void clearChunk(MinifyLocationKey key) {
+    private void clearChunk(MinifyLocationKey key, boolean clearWalls) {
         ServerLevel dimension = this.level.getServer().getLevel(DimensionRegistry.WORLD_KEY);
         int y = key.yChunk() * 16;
+
+        isSilentlyPlacingIntoWorld.set(true);
+
+        int f = clearWalls ? 0 : 1;
+        int t = clearWalls ? 9 : 8;
+
         for (BlockPos blockPos : BlockPos.betweenClosed(
-            key.chunk().getBlockAt(0, y, 0),
-            key.chunk().getBlockAt(15, y + 15, 15)
+            key.chunk().getBlockAt(f, y + f, f),
+            key.chunk().getBlockAt(t, y + t, t)
         )) {
             dimension.setBlock(blockPos, Blocks.AIR.defaultBlockState(), 3);
         }
+
+        isSilentlyPlacingIntoWorld.set(false);
     }
 
     private void setChunkForceLoaded(ChunkPos pos, boolean value) {
@@ -105,7 +108,7 @@ public class MinifyChunkManager extends SavedData {
 
     public void onBlockChangedAt(BlockPos pos, BlockState state) {
         //TODO: threadlocal boolean to test if the blocks have changed at all.
-        if(DimensionRegistry.WORLD_KEY.equals(this.level.dimension())) {
+        if(DimensionRegistry.WORLD_KEY.equals(this.level.dimension()) && !isSilentlyPlacingIntoWorld.get()) {
             ChunkPos chunkPos = new ChunkPos(pos);
             int chunkY = pos.getY() >> 4;
 
@@ -159,8 +162,8 @@ public class MinifyChunkManager extends SavedData {
         return Optional.empty();
     }
 
-    //TODO: recursively copy viewers
     public void copyTo(MinifySourceKey src, MinifyLocationKey dest) {
+        this.clearChunk(dest, false);
         Optional<ServerLevel> levelOptional = this.findFromKey(src);
         if(levelOptional.isEmpty()) {
             return;
@@ -182,8 +185,23 @@ public class MinifyChunkManager extends SavedData {
             dimension.setBlock(destPos, state, 3);
 
             BlockEntity entity = level.getBlockEntity(srcPos);
-            if(entity instanceof MinifyViewerBlockEntity)
-            if(entity != null) {
+            if(entity instanceof MinifyViewerBlockEntity minifyViewerBlock) {
+                MinifyLocationKey locationKey = minifyViewerBlock.getLocationKey();
+                Stack<MinifyLocationKey> stack = currentlyProcessedKeys.get();
+                if(stack.contains(locationKey)) {
+                   Constants.LOG.warn("Location Key is Inside Itself? {} @ {}. Stack={}", locationKey, srcPos, stack);
+                } else {
+                    MinifyViewerBlockEntity blockEntity = new MinifyViewerBlockEntity(destPos, state);
+                    dimension.setBlockEntity(blockEntity);
+
+                    //setSourceLocationKey will call this method (copyTo), hence recursively copying the data
+                    stack.push(locationKey);
+                    blockEntity.setToData();
+                    blockEntity.setSourceLocationKey(minifyViewerBlock.getSourceLocationKey());
+                    stack.pop();
+                }
+
+            } else if(entity != null) {
                 BlockEntity blockEntity = BlockEntity.loadStatic(
                     destPos, state,
                     entity.saveWithId()
@@ -232,7 +250,7 @@ public class MinifyChunkManager extends SavedData {
 
         int maxSignal = 0;
         for (BlockPos pos : getAllBlocksForSide(direction.getOpposite())) {
-            int signal = dimension.getSignal(pos.offset(start).relative(direction), direction.getOpposite());
+            int signal = dimension.getSignal(pos.offset(start).relative(direction), direction);
             maxSignal = Math.max(maxSignal, signal);
         }
 
@@ -295,6 +313,9 @@ public class MinifyChunkManager extends SavedData {
     //https://stackoverflow.com/a/3706260
     //Spiral search to find next chunk
     public MinifyLocationKey findNextLocation() {
+        Set<MinifyLocationKey> allViewers = StreamSupport.stream(this.level.getServer().getAllLevels().spliterator(), false)
+            .flatMap(s -> getManager(s).viewers.keySet().stream())
+            .collect(Collectors.toSet());
         // (dx, dz) is a vector - direction in which we move right now
         int dx = 0;
         int dz = 1;
@@ -309,7 +330,7 @@ public class MinifyChunkManager extends SavedData {
         do {
             for(int i = 0; i < 16; i++) {
                 MinifyLocationKey testKey = new MinifyLocationKey(new ChunkPos(x, z), i);
-                if(!this.viewers.containsKey(testKey)) {
+                if(!allViewers.contains(testKey)) {
                     return testKey;
                 }
             }

@@ -42,12 +42,24 @@ public class MinifyViewerBlockEntity extends BlockEntity {
         this.setChanged();
         if (this.level instanceof ServerLevel serverLevel) {
             MinifyChunkManager.getManager(serverLevel).copyTo(sourceLocationKey, this.locationKey);
+
+            //Refresh the world cache, then send it to the client
+            if(this.worldCache != null) {
+                this.refreshWorldCache();
+            }
             this.getOrGenerateWorldCache().ifPresent(cache ->
                 Services.NETWORK.sendToAllAround(new S2CSendViewerData(this.getBlockPos(), cache), serverLevel, this.getBlockPos())
             );
         }
     }
 
+    public MinifySourceKey getSourceLocationKey() {
+        return sourceLocationKey;
+    }
+
+    public MinifyLocationKey getLocationKey() {
+        return locationKey;
+    }
 
     @Override
     public Packet<ClientGamePacketListener> getUpdatePacket() {
@@ -133,16 +145,22 @@ public class MinifyViewerBlockEntity extends BlockEntity {
             this.worldCache = new PalettedContainer<>(Block.BLOCK_STATE_REGISTRY, Blocks.AIR.defaultBlockState(), PalettedContainer.Strategy.SECTION_STATES);
         }
         if(!this.level.isClientSide && this.worldCache == null && this.locationKey != null) {
-            ServerLevel dimension = this.level.getServer().getLevel(DimensionRegistry.WORLD_KEY);
             this.worldCache = new PalettedContainer<>(Block.BLOCK_STATE_REGISTRY, Blocks.AIR.defaultBlockState(), PalettedContainer.Strategy.SECTION_STATES);
-
-            BlockPos start = this.locationKey.chunk().getBlockAt(0, this.locationKey.yChunk() * 16, 0).offset(1, 1, 1);
-
-            for (BlockPos offset : BlockPos.betweenClosed(0, 0, 0, 7, 7, 7)) {
-                this.worldCache.set(offset.getX(), offset.getY(), offset.getZ(), dimension.getBlockState(start.offset(offset)));
-            }
+            this.refreshWorldCache();
         }
         return Optional.ofNullable(this.worldCache);
+    }
+
+    private void refreshWorldCache() {
+        if(this.level.isClientSide) {
+            return;
+        }
+        ServerLevel dimension = this.level.getServer().getLevel(DimensionRegistry.WORLD_KEY);
+        BlockPos start = this.locationKey.chunk().getBlockAt(0, this.locationKey.yChunk() * 16, 0).offset(1, 1, 1);
+
+        for (BlockPos offset : BlockPos.betweenClosed(0, 0, 0, 7, 7, 7)) {
+            this.worldCache.set(offset.getX(), offset.getY(), offset.getZ(), dimension.getBlockState(start.offset(offset)));
+        }
     }
 
     public void requestOnClientIfNeeded() {
