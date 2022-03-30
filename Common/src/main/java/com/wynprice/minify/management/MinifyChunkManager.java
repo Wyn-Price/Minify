@@ -119,7 +119,7 @@ public class MinifyChunkManager extends SavedData {
             int zPos = Mth.floor(z) >> 4;
             MinifyLocationKey key = new MinifyLocationKey(new ChunkPos(xPos, zPos), yPos);
             this.findViewerForKey(key).ifPresent(blockEntity -> {
-                blockEntity.getLevel().playSound(null, blockEntity.getBlockPos(), sound, source, volume * 0.5F, pitch + 0.5F);
+                blockEntity.getLevel().playSound(null, blockEntity.getBlockPos(), sound, source, volume * 0.5F, pitch + 0.75F);
             });
             isPlayingMinifiedSound.set(false);
         }
