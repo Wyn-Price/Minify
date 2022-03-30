@@ -8,7 +8,6 @@
         "MixinLevelChunk"
     ],
     "client": [
-        "MixinClientLevel"
     ],
     "injectors": {
       "defaultRequire": 1
