@@ -60,7 +60,7 @@ public class MinifyChunkManager extends SavedData {
         );
     }
 
-    public void setViewerLocation(MinifyLocationKey key, BlockPos pos) {
+    public void setViewerLocation(MinifyLocationKey key, BlockPos pos, MinifyViewerBlockEntity blockEntity) {
         //Do we need this? The onRemove method shoud always remove it.
         for (ServerLevel serverLevel : this.level.getServer().getAllLevels()) {
             MinifyChunkManager manager = getManager(serverLevel);
@@ -70,7 +70,7 @@ public class MinifyChunkManager extends SavedData {
         }
 
         this.viewers.put(key, pos);
-        this.updateRedstoneWall(key, pos, true);
+        this.updateRedstoneWall(key, pos, blockEntity, true);
         this.onLoad(key);
         this.setDirty();
     }
@@ -227,15 +227,21 @@ public class MinifyChunkManager extends SavedData {
         }
     }
 
-    public void updateRedstoneWall(MinifyLocationKey key, BlockPos pos, boolean useRedstoneLevels) {
+    public void updateRedstoneWall(MinifyLocationKey key, BlockPos pos, MinifyViewerBlockEntity blockEntity, boolean useRedstoneLevels) {
 
         isUpdatingRedstoneWall.set(true);
         ServerLevel dimension = this.level.getServer().getLevel(DimensionRegistry.WORLD_KEY);
 
         BlockPos start = key.chunk().getBlockAt(0, key.yChunk() * 16, 0);
 
-        for (Direction dir : Direction.values()) {
-            int level = Mth.clamp(this.level.getSignal(pos.relative(dir), dir) - 1, 0, 15);
+        for (Direction rawDir : Direction.values()) {
+            int level = Mth.clamp(this.level.getSignal(pos.relative(rawDir), rawDir) - 1, 0, 15);
+            Direction dir = rawDir;
+            if(dir.getAxis().isHorizontal()) {
+                for (int i = 0; i < 4 - blockEntity.getHorizontalRotationIndex(); i++) {
+                    dir = dir.getCounterClockWise();
+                }
+            }
             for (BlockPos blockPos : getAllBlocksForSide(dir)) {
                 dimension.setBlock(start.offset(blockPos), MinifyBlocks.MINIFY_CHUNK_WALL.defaultBlockState().setValue(WallRedstoneBlock.LEVEL, useRedstoneLevels ? level : 0), 3);
             }

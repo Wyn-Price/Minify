@@ -27,7 +27,11 @@ public class MinifyViewerBlockEntity extends BlockEntity {
     private MinifyLocationKey locationKey;
     private MinifySourceKey sourceLocationKey;
 
-    private boolean isUpdatingNeighbours;
+    //0=NORTH, 1=EAST, 2=SOUTH, 3=WEST
+    //Rotation is stored here instead of a state as eventually I want to
+    //Do unlimited rotation, and don't want to have to deal with removing
+    //state prop and replacing it with a index.
+    private int horizontalRotationIndex = 0;
     private int[] signalsInDirections = new int[Direction.values().length];
 
     private PalettedContainer<BlockState> worldCache;
@@ -61,6 +65,15 @@ public class MinifyViewerBlockEntity extends BlockEntity {
         return locationKey;
     }
 
+
+    public void setHorizontalRotationIndex(int horizontalRotationIndex) {
+        this.horizontalRotationIndex = horizontalRotationIndex;
+    }
+
+    public int getHorizontalRotationIndex() {
+        return horizontalRotationIndex;
+    }
+
     @Override
     public Packet<ClientGamePacketListener> getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);
@@ -77,7 +90,7 @@ public class MinifyViewerBlockEntity extends BlockEntity {
                 this.locationKey = MinifyChunkManager.getManager(serverLevel).findNextLocation();
                 this.setChanged();
             }
-            MinifyChunkManager.getManager(serverLevel).setViewerLocation(this.locationKey, this.getBlockPos());
+            MinifyChunkManager.getManager(serverLevel).setViewerLocation(this.locationKey, this.getBlockPos(), this);
         }
     }
 
@@ -96,6 +109,7 @@ public class MinifyViewerBlockEntity extends BlockEntity {
             tag.put("source_location_key", MinifySourceKey.toNBT(this.sourceLocationKey, new CompoundTag()));
         }
         tag.putIntArray("signal_values", this.signalsInDirections);
+        tag.putInt("horizontal_rotation_index", this.horizontalRotationIndex);
         super.saveAdditional(tag);
     }
 
@@ -109,6 +123,7 @@ public class MinifyViewerBlockEntity extends BlockEntity {
             this.setChanged();
         }
         this.signalsInDirections = tag.getIntArray("signal_values");
+        this.horizontalRotationIndex = tag.getInt("horizontal_rotation_index");
 
         //Ensure size
         if(this.signalsInDirections.length != Direction.values().length) {
@@ -119,7 +134,7 @@ public class MinifyViewerBlockEntity extends BlockEntity {
 
     public final void updateRedstoneWall() {
         if (this.level instanceof ServerLevel) {
-            MinifyChunkManager.getManager((ServerLevel) this.level).updateRedstoneWall(this.locationKey, this.getBlockPos(), true);
+            MinifyChunkManager.getManager((ServerLevel) this.level).updateRedstoneWall(this.locationKey, this.getBlockPos(), this, true);
         }
     }
 
@@ -133,10 +148,8 @@ public class MinifyViewerBlockEntity extends BlockEntity {
         }
         this.signalsInDirections[direction.ordinal()] = signal;
         this.setChanged();
-        if(!this.level.isClientSide) {// && !this.isUpdatingNeighbours
-            this.isUpdatingNeighbours = true;
+        if(!this.level.isClientSide) {
             this.level.updateNeighborsAt(this.getBlockPos(), this.getBlockState().getBlock());
-            this.isUpdatingNeighbours = false;
         }
     }
 
