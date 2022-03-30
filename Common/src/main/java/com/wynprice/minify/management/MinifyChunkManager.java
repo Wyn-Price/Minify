@@ -61,6 +61,14 @@ public class MinifyChunkManager extends SavedData {
     }
 
     public void setViewerLocation(MinifyLocationKey key, BlockPos pos) {
+        //Do we need this? The onRemove method shoud always remove it.
+        for (ServerLevel serverLevel : this.level.getServer().getAllLevels()) {
+            MinifyChunkManager manager = getManager(serverLevel);
+            if(manager.viewers.containsKey(key)) {
+                this.onUnloadViewer(key);
+            }
+        }
+
         this.viewers.put(key, pos);
         this.updateRedstoneWall(key, pos, true);
         this.onLoad(key);
@@ -191,14 +199,15 @@ public class MinifyChunkManager extends SavedData {
                 if(stack.contains(locationKey)) {
                    Constants.LOG.warn("Location Key is Inside Itself? {} @ {}. Stack={}", locationKey, srcPos, stack);
                 } else {
-                    MinifyViewerBlockEntity blockEntity = new MinifyViewerBlockEntity(destPos, state);
-                    dimension.setBlockEntity(blockEntity);
+                    BlockEntity rawBlockEntity = dimension.getBlockEntity(destPos);
+                    if(rawBlockEntity instanceof MinifyViewerBlockEntity blockEntity) {
+                        //setSourceLocationKey will call this method (copyTo), hence recursively copying the data
+                        stack.push(locationKey);
+                        blockEntity.setToData();
+                        blockEntity.setSourceLocationKey(minifyViewerBlock.getSourceLocationKey());
+                        stack.pop();
+                    }
 
-                    //setSourceLocationKey will call this method (copyTo), hence recursively copying the data
-                    stack.push(locationKey);
-                    blockEntity.setToData();
-                    blockEntity.setSourceLocationKey(minifyViewerBlock.getSourceLocationKey());
-                    stack.pop();
                 }
 
             } else if(entity != null) {
