@@ -15,6 +15,8 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -32,6 +34,7 @@ public class MinifyChunkManager extends SavedData {
 
     public static ThreadLocal<Boolean> isSilentlyPlacingIntoWorld = ThreadLocal.withInitial(() -> false);
     public static ThreadLocal<Boolean> isUpdatingRedstoneWall = ThreadLocal.withInitial(() -> false);
+    public static ThreadLocal<Boolean> isPlayingMinifiedSound = ThreadLocal.withInitial(() -> false);
 
     public static ThreadLocal<Stack<MinifyLocationKey>> currentlyProcessedKeys = ThreadLocal.withInitial(Stack::new);
     private final ServerLevel level;
@@ -106,6 +109,20 @@ public class MinifyChunkManager extends SavedData {
         }
 
         isSilentlyPlacingIntoWorld.set(false);
+    }
+
+    public void onSoundPlayed(double x, double y, double z, SoundEvent sound, SoundSource source, float volume, float pitch) {
+        if(DimensionRegistry.WORLD_KEY.equals(this.level.dimension()) && !isPlayingMinifiedSound.get()) {
+            isPlayingMinifiedSound.set(true);
+            int xPos = Mth.floor(x) >> 4;
+            int yPos = Mth.floor(y) >> 4;
+            int zPos = Mth.floor(z) >> 4;
+            MinifyLocationKey key = new MinifyLocationKey(new ChunkPos(xPos, zPos), yPos);
+            this.findViewerForKey(key).ifPresent(blockEntity -> {
+                blockEntity.getLevel().playSound(null, blockEntity.getBlockPos(), sound, source, volume * 0.5F, pitch + 0.5F);
+            });
+            isPlayingMinifiedSound.set(false);
+        }
     }
 
     private void setChunkForceLoaded(ChunkPos pos, boolean value) {
