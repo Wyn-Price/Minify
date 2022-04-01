@@ -9,6 +9,11 @@
         "MixinServerLevel"
     ],
     "client": [
+        "MixinMinecraft",
+        "BiomeManagerAccessor",
+        "MixinClientChunkCacheStorage",
+        "MixinClientChunkCache",
+        "MixinLevelChunkSection"
     ],
     "injectors": {
       "defaultRequire": 1

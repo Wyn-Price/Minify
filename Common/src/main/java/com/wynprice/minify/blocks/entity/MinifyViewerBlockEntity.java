@@ -1,9 +1,11 @@
 package com.wynprice.minify.blocks.entity;
 
+import com.wynprice.minify.client.MinifyViewerClientLevel;
 import com.wynprice.minify.generation.DimensionRegistry;
 import com.wynprice.minify.management.MinifyChunkManager;
 import com.wynprice.minify.management.MinifyLocationKey;
 import com.wynprice.minify.management.MinifySourceKey;
+import com.wynprice.minify.network.C2SRequestNestedData;
 import com.wynprice.minify.network.C2SRequestViewerData;
 import com.wynprice.minify.network.S2CSendViewerData;
 import com.wynprice.minify.platform.Services;
@@ -14,6 +16,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -55,7 +58,7 @@ public class MinifyViewerBlockEntity extends BlockEntity {
                 this.refreshWorldCache();
             }
             this.getOrGenerateWorldCache().ifPresent(cache ->
-                Services.NETWORK.sendToAllAround(new S2CSendViewerData(this.getBlockPos(), cache, this.blockEntityMap), serverLevel, this.getBlockPos())
+                Services.NETWORK.sendToAllAround(new S2CSendViewerData(this.getBlockPos(), Optional.empty(), cache, this.blockEntityMap), serverLevel, this.getBlockPos())
             );
         }
     }
@@ -178,12 +181,13 @@ public class MinifyViewerBlockEntity extends BlockEntity {
         BlockPos start = this.locationKey.chunk().getBlockAt(0, this.locationKey.yChunk() * 16, 0).offset(1, 1, 1);
 
         for (BlockPos offset : BlockPos.betweenClosed(0, 0, 0, 7, 7, 7)) {
-            this.worldCache.set(offset.getX(), offset.getY(), offset.getZ(), dimension.getBlockState(start.offset(offset)));
-            BlockEntity blockEntity = dimension.getBlockEntity(start.offset(offset));
+            BlockPos blockPos = start.offset(offset);
+            this.worldCache.set(offset.getX(), offset.getY(), offset.getZ(), dimension.getBlockState(blockPos));
+            BlockEntity blockEntity = dimension.getBlockEntity(blockPos);
             if(blockEntity != null) {
-                this.blockEntityMap.put(offset, blockEntity);
+                this.blockEntityMap.put(offset.immutable(), blockEntity);
             } else {
-                this.blockEntityMap.remove(offset);
+                this.blockEntityMap.remove(offset.immutable());
             }
         }
     }
@@ -193,5 +197,18 @@ public class MinifyViewerBlockEntity extends BlockEntity {
             this.hasClientRequestedData = true;
             Services.NETWORK.sendToServer(new C2SRequestViewerData(this.getBlockPos()));
         }
+    }
+
+    public void requestNestedClientIfNeeded() {
+        if(!this.hasClientRequestedData && this.level instanceof MinifyViewerClientLevel minifyLevel) {
+            this.hasClientRequestedData = true;
+            Services.NETWORK.sendToServer(new C2SRequestNestedData(minifyLevel.getCurrentBlockEntity().getBlockPos(), this.getBlockPos()));
+        }
+    }
+
+    public static void clientTick(Level level, BlockPos pos, BlockState state, MinifyViewerBlockEntity blockEntity) {
+       MinifyViewerClientLevel.getIfPossible().ifPresent(mLevel ->
+           blockEntity.getOrGenerateWorldCache().ifPresent(cache -> mLevel.injectAndRun(blockEntity, mLevel::tickEntities))
+       );
     }
 }

@@ -35,7 +35,7 @@ public class EmptyChunkGenerator extends ChunkGenerator {
     private final Registry<Biome> biomes;
 
     public EmptyChunkGenerator(Registry<StructureSet> structureSets, Registry<Biome> biomes) {
-        super(structureSets, Optional.empty(), new FixedBiomeSource(biomes.getOrCreateHolder(Biomes.PLAINS)));
+        super(structureSets, Optional.empty(), new FixedBiomeSource(biomes.getOrCreateHolder(Biomes.THE_END)));
         this.biomes = biomes;
     }
 

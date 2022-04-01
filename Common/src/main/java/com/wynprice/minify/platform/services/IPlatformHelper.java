@@ -1,6 +1,7 @@
 package com.wynprice.minify.platform.services;
 
 import com.mojang.datafixers.types.Type;
+import com.wynprice.minify.mixin.MixinClientChunkCacheStorage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -37,4 +38,7 @@ public interface IPlatformHelper {
 
 
     <T extends BlockEntity> Function<Type<?>, BlockEntityType<T>> createBlockEntity(BiFunction<BlockPos, BlockState, T> function, Block... blocks);
+
+    //Object: ClientChunkCache
+    MixinClientChunkCacheStorage getAccessor(Object o);
 }

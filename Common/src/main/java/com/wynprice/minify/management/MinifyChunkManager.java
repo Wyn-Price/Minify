@@ -5,8 +5,17 @@ import com.wynprice.minify.blocks.MinifyBlocks;
 import com.wynprice.minify.blocks.WallRedstoneBlock;
 import com.wynprice.minify.blocks.entity.MinifyViewerBlockEntity;
 import com.wynprice.minify.generation.DimensionRegistry;
+import com.wynprice.minify.network.S2CMinifiyBlockEvent;
+import com.wynprice.minify.network.S2CUpdateViewerBlockEntityData;
 import com.wynprice.minify.network.S2CUpdateViewerData;
 import com.wynprice.minify.platform.Services;
+import it.unimi.dsi.fastutil.bytes.ByteSet;
+import it.unimi.dsi.fastutil.ints.IntArraySet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.longs.LongArraySet;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -18,6 +27,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
+import net.minecraft.world.level.BlockEventData;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -40,6 +50,8 @@ public class MinifyChunkManager extends SavedData {
     private final ServerLevel level;
 
     private final Map<MinifyLocationKey, BlockPos> viewers = new HashMap<>();
+
+    private final Map<MinifyLocationKey, IntSet> scheduledUpdates = new HashMap<>();
 
     public MinifyChunkManager(ServerLevel level, CompoundTag tag) {
         this.level = level;
@@ -119,7 +131,7 @@ public class MinifyChunkManager extends SavedData {
             int zPos = Mth.floor(z) >> 4;
             MinifyLocationKey key = new MinifyLocationKey(new ChunkPos(xPos, zPos), yPos);
             this.findViewerForKey(key).ifPresent(blockEntity -> {
-                blockEntity.getLevel().playSound(null, blockEntity.getBlockPos(), sound, source, volume * 0.5F, pitch + 0.75F);
+                blockEntity.getLevel().playSound(null, blockEntity.getBlockPos(), sound, source, volume * 0.25F, pitch + 1F);
             });
             isPlayingMinifiedSound.set(false);
         }
@@ -130,65 +142,111 @@ public class MinifyChunkManager extends SavedData {
         dimension.setChunkForced(pos.x, pos.z, value);
     }
 
+    public void onTick() {
+        this.scheduledUpdates.forEach((key, updates) -> {
+            Optional<MinifyViewerBlockEntity> viewer = this.findViewerForKey(key);
+            if(viewer.isEmpty() || updates.isEmpty()) {
+                return;
+            }
 
-    public void onBlockChangedAt(BlockPos pos, BlockState state) {
-        //TODO: threadlocal boolean to test if the blocks have changed at all.
-        if(DimensionRegistry.WORLD_KEY.equals(this.level.dimension()) && !isSilentlyPlacingIntoWorld.get()) {
-            ChunkPos chunkPos = new ChunkPos(pos);
-            int chunkY = pos.getY() >> 4;
+            MinifyViewerBlockEntity blockEntity = viewer.get();
+            BlockPos basePos = key.chunk().getBlockAt(0, key.yChunk() * 16, 0).offset(1, 1, 1);
 
-            int innerX = pos.getX() & 15;
-            int innerY = pos.getY() & 15;
-            int innerZ = pos.getZ() & 15;
+            var updateData = updates.intStream().mapToObj(p -> {
+                BlockPos position = this.decode(p);
+                BlockPos worldPosition = basePos.offset(position);
 
-            boolean isInRange = innerX >= 1 && innerY >= 1 && innerZ >= 1 && innerX <= 8 && innerY <= 8 && innerZ <= 8;
-            MinifyLocationKey key = new MinifyLocationKey(chunkPos, chunkY);
-            if(isInRange) {
-
-                //Update the viewer signals
-                if(!isUpdatingRedstoneWall.get()) {
-                    for (Direction value : Direction.values()) {
-                        this.updateViewerSignal(key, value);
-                    }
+                BlockState state = this.level.getBlockState(worldPosition);
+                BlockEntity entity = this.level.getBlockEntity(worldPosition);
+                if (entity != null) {
+                    blockEntity.getBlockEntityMap().put(position, entity);
+                    Services.NETWORK.sendToAllAround(new S2CUpdateViewerBlockEntityData(blockEntity.getBlockPos(), position, entity.getUpdateTag()), (ServerLevel) blockEntity.getLevel(), blockEntity.getBlockPos());
+                } else {
+                    blockEntity.getBlockEntityMap().remove(position);
                 }
+                return new S2CUpdateViewerData.UpdateData(position, state);
+            }).toList();
 
-                //Update the viewer, and sync changes with clients
-                //TODO: batch the updates into one packet.
-                Optional<MinifyViewerBlockEntity> viewer = this.findViewerForKey(key);
-                if(viewer.isPresent()) {
-                    MinifyViewerBlockEntity blockEntity = viewer.get();
-                    var worldCache = blockEntity.getOrGenerateWorldCache();
-                    if(worldCache.isPresent()) {
-                        worldCache.get().set(
-                            innerX-1, innerY-1, innerZ-1, state
-                        );
+            Services.NETWORK.sendToAllAround(new S2CUpdateViewerData(blockEntity.getBlockPos(), updateData), (ServerLevel) blockEntity.getLevel(), blockEntity.getBlockPos());
+        });
+        this.scheduledUpdates.clear();
+    }
 
-                        BlockPos worldPosition = new BlockPos(innerX-1, innerY-1, innerZ-1);
-                        BlockEntity entity = this.level.getBlockEntity(pos);
-                        if(entity != null) {
-                            blockEntity.getBlockEntityMap().put(worldPosition, entity);
-                        } else {
-                            blockEntity.getBlockEntityMap().remove(worldPosition);
-                        }
+    private int encode(int innerX, int innerY, int innerZ) {
+        //inner has range 0,1,2,3,4,5,6,7
+        return (innerX & 7) << 6 | (innerY & 7) << 3 | (innerZ & 7);
+    }
 
-                        Level level = blockEntity.getLevel();
-                        //Should always be true
-                        if(level instanceof ServerLevel serverLevel) {
+    private BlockPos decode(int value) {
+        return new BlockPos(
+            (value >> 6) & 7,
+            (value >> 3) & 7,
+            (value) & 7
+        );
+    }
 
-                            Services.NETWORK.sendToAllAround(new S2CUpdateViewerData(
-                                blockEntity.getBlockPos(), new BlockPos(innerX-1, innerY-1, innerZ-1),
-                                state,
-                                entity == null ? null : entity.saveWithFullMetadata()
-                            ), serverLevel, blockEntity.getBlockPos());
-                        }
+    public void onBlockChangedAt(BlockPos pos) {
+        if(!DimensionRegistry.WORLD_KEY.equals(this.level.dimension()) && !isSilentlyPlacingIntoWorld.get()) {
+            return;
+        }
+        BlockState state = this.level.getBlockState(pos);
+        ChunkPos chunkPos = new ChunkPos(pos);
+        int chunkY = pos.getY() >> 4;
 
-                    }
+        int innerX = pos.getX() & 15;
+        int innerY = pos.getY() & 15;
+        int innerZ = pos.getZ() & 15;
+
+        boolean isInRange = innerX >= 1 && innerY >= 1 && innerZ >= 1 && innerX <= 8 && innerY <= 8 && innerZ <= 8;
+        MinifyLocationKey key = new MinifyLocationKey(chunkPos, chunkY);
+        if(isInRange) {
+
+            //Update the viewer signals
+            if(!isUpdatingRedstoneWall.get()) {
+                for (Direction value : Direction.values()) {
+                    this.updateViewerSignal(key, value);
                 }
+            }
+
+            this.scheduledUpdates.computeIfAbsent(key, k -> new IntArraySet()).add(this.encode(innerX-1, innerY-1, innerZ-1));
+            Optional<MinifyViewerBlockEntity> viewer = this.findViewerForKey(key);
+            if(viewer.isPresent()) {
+                MinifyViewerBlockEntity blockEntity = viewer.get();
+                blockEntity.getOrGenerateWorldCache().ifPresent(blockStatePalettedContainer -> blockStatePalettedContainer.set(innerX - 1, innerY - 1, innerZ - 1, state));
+            }
+        }
+
+    }
+
+    public void doBlockEvent(BlockEventData eventData) {
+        BlockPos pos = eventData.pos();
+        ChunkPos chunkPos = new ChunkPos(pos);
+        int chunkY = pos.getY() >> 4;
+        int innerX = pos.getX() & 15;
+        int innerY = pos.getY() & 15;
+        int innerZ = pos.getZ() & 15;
+        MinifyLocationKey key = new MinifyLocationKey(chunkPos, chunkY);
+        boolean isInRange = innerX >= 1 && innerY >= 1 && innerZ >= 1 && innerX <= 8 && innerY <= 8 && innerZ <= 8;
+        if(isInRange) {
+            Optional<MinifyViewerBlockEntity> viewer = this.findViewerForKey(key);
+            if (viewer.isPresent()) {
+                MinifyViewerBlockEntity blockEntity = viewer.get();
+                Services.NETWORK.sendToAllAround(
+                    new S2CMinifiyBlockEvent(
+                        blockEntity.getBlockPos(), new BlockPos(innerX-1, innerY-1, innerZ-1),
+                        eventData.paramA(), eventData.paramB()
+                    ),
+                    (ServerLevel) blockEntity.getLevel(),
+                    blockEntity.getBlockPos()
+                );
             }
         }
     }
 
     private Optional<ServerLevel> findFromKey(MinifySourceKey key) {
+        if(key == null) {
+            return Optional.empty();
+        }
         for (ServerLevel level : this.level.getServer().getAllLevels()) {
             if (level.dimension().location().equals(key.dimension())) {
                 return Optional.of(level);
@@ -224,7 +282,7 @@ public class MinifyChunkManager extends SavedData {
                 MinifyLocationKey locationKey = minifyViewerBlock.getLocationKey();
                 Stack<MinifyLocationKey> stack = currentlyProcessedKeys.get();
                 if(stack.contains(locationKey)) {
-                   Constants.LOG.warn("Location Key is Inside Itself? {} @ {}. Stack={}", locationKey, srcPos, stack);
+                    Constants.LOG.warn("Location Key is Inside Itself? {} @ {}. Stack={}", locationKey, srcPos, stack);
                 } else {
                     BlockEntity rawBlockEntity = dimension.getBlockEntity(destPos);
                     if(rawBlockEntity instanceof MinifyViewerBlockEntity blockEntity) {
@@ -270,7 +328,12 @@ public class MinifyChunkManager extends SavedData {
                 }
             }
             for (BlockPos blockPos : getAllBlocksForSide(dir)) {
-                dimension.setBlock(start.offset(blockPos), MinifyBlocks.MINIFY_CHUNK_WALL.defaultBlockState().setValue(WallRedstoneBlock.LEVEL, useRedstoneLevels ? level : 0), 3);
+                dimension.setBlock(start.offset(blockPos), MinifyBlocks.MINIFY_CHUNK_WALL.defaultBlockState().setValue(WallRedstoneBlock.LEVEL, useRedstoneLevels ? level : 0), 2);
+            }
+        }
+        for (Direction dir : Direction.values()) {
+            for (BlockPos blockPos : getAllBlocksForSide(dir)) {
+                dimension.updateNeighborsAt(start.offset(blockPos).relative(dir.getOpposite()), MinifyBlocks.MINIFY_CHUNK_WALL);
             }
         }
         isUpdatingRedstoneWall.set(false);
@@ -296,6 +359,12 @@ public class MinifyChunkManager extends SavedData {
             maxSignal = Math.max(maxSignal, signal);
         }
 
+        if(direction.getAxis().isHorizontal()) {
+            for (int i = 0; i < blockEntity.get().getHorizontalRotationIndex(); i++) {
+                direction = direction.getCounterClockWise();
+            }
+
+        }
         blockEntity.get().setSignal(direction, Mth.clamp(maxSignal - 1, 0, 15));
     }
 

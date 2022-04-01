@@ -14,44 +14,38 @@ import net.minecraft.world.level.chunk.PalettedContainer;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-public class S2CSendViewerData {
-    private final BlockPos blockPos;
-    private final byte[] containerData; //PalettedContainer<BlockState>#write
-    private final Map<BlockPos, CompoundTag> blockEntities;
+//containerData is from PalettedContainer<BlockState>#write
+public record S2CSendViewerData(BlockPos blockPos, Optional<BlockPos> nestedPosition, byte[] containerData, Map<BlockPos, CompoundTag> blockEntities) {
 
-    public S2CSendViewerData(BlockPos blockPos, PalettedContainer<BlockState> container, Map<BlockPos, BlockEntity> blockEntities) {
-        this.blockPos = blockPos;
+    public S2CSendViewerData(BlockPos blockPos, Optional<BlockPos> nestedPosition, PalettedContainer<BlockState> container, Map<BlockPos, BlockEntity> blockEntities) {
+        this(blockPos, nestedPosition, convertToBytes(container), blockEntities.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().saveWithId())));
+    }
 
+    private static byte[] convertToBytes(PalettedContainer<BlockState> container) {
         //Convert PalledContainer to raw bytes
         ByteBuf buffer = Unpooled.buffer();
         var friendly = new FriendlyByteBuf(buffer);
         int start = buffer.writerIndex();
         container.write(friendly);
         int end = buffer.writerIndex();
-        this.containerData = ByteBufUtil.getBytes(buffer, start, end - start);
-
-        this.blockEntities = blockEntities.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().saveWithFullMetadata()));
-    }
-
-    public S2CSendViewerData(BlockPos pos, byte[] containerData, Map<BlockPos, CompoundTag> blockEntities) {
-        this.blockPos = pos;
-        this.containerData = containerData;
-        this.blockEntities = blockEntities;
+        return ByteBufUtil.getBytes(buffer, start, end - start);
     }
 
 
     public static void encode(S2CSendViewerData data, FriendlyByteBuf buf) {
         buf.writeBlockPos(data.blockPos);
+        buf.writeOptional(data.nestedPosition, FriendlyByteBuf::writeBlockPos);
         buf.writeByteArray(data.containerData);
         buf.writeMap(data.blockEntities, FriendlyByteBuf::writeBlockPos,FriendlyByteBuf::writeNbt);
     }
 
     public static S2CSendViewerData decode(FriendlyByteBuf buf) {
         return new S2CSendViewerData(
-            buf.readBlockPos(), buf.readByteArray(),
+            buf.readBlockPos(), buf.readOptional(FriendlyByteBuf::readBlockPos), buf.readByteArray(),
             buf.readMap(FriendlyByteBuf::readBlockPos, FriendlyByteBuf::readAnySizeNbt)
         );
     }
@@ -60,19 +54,34 @@ public class S2CSendViewerData {
         Minecraft minecraft = client.get();
         BlockEntity entity = minecraft.level.getBlockEntity(packet.blockPos);
         if(entity instanceof MinifyViewerBlockEntity blockEntity) {
-            blockEntity.getOrGenerateWorldCache().ifPresent(cache -> {
+            MinifyViewerBlockEntity viewerBlock;
+            if(packet.nestedPosition.isPresent()) {
+                BlockEntity block = blockEntity.getBlockEntityMap().get(packet.nestedPosition.get());
+                if(block instanceof MinifyViewerBlockEntity minifyViewerBlockEntity) {
+                    viewerBlock = minifyViewerBlockEntity;
+                }  else {
+                    return;
+                }
+            } else {
+                viewerBlock = blockEntity;
+            }
+            viewerBlock.getOrGenerateWorldCache().ifPresent(cache -> {
                 ByteBuf buffer = Unpooled.copiedBuffer(packet.containerData);
                 var friendly = new FriendlyByteBuf(buffer);
                 cache.read(friendly);
 
-                var entityList = blockEntity.getBlockEntityMap();
+                var entityList = viewerBlock.getBlockEntityMap();
                 entityList.clear();
                 packet.blockEntities.forEach((pos, tag) -> {
                     BlockState state = cache.get(pos.getX(), pos.getY(), pos.getZ());
                     BlockEntity loadStatic = BlockEntity.loadStatic(
-                        BlockEntity.getPosFromTag(tag), state, tag
+                        pos, state, tag
                     );
-                    entityList.put(pos, loadStatic);
+                    if(loadStatic != null) {
+                        entityList.put(pos, loadStatic);
+                    } else {
+                        entityList.remove(pos);
+                    }
                 });
             });
 

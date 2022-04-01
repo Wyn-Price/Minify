@@ -30,9 +30,10 @@ loom {
             runDir("run")
         }
     }
+
+    accessWidenerPath = file("src/main/resources/minify.accesswidener")
+
 }
-
-
 processResources {
     from project(":Common").sourceSets.main.resources
     inputs.property "version", project.version

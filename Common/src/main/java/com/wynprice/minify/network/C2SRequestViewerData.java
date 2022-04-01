@@ -8,14 +8,10 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
+import java.util.Optional;
 import java.util.function.Supplier;
 
-public class C2SRequestViewerData {
-    private final BlockPos blockPos;
-
-    public C2SRequestViewerData(BlockPos blockPos) {
-        this.blockPos = blockPos;
-    }
+public record C2SRequestViewerData(BlockPos blockPos) {
 
     public static void encode(C2SRequestViewerData data, FriendlyByteBuf buf) {
         buf.writeBlockPos(data.blockPos);
@@ -27,9 +23,9 @@ public class C2SRequestViewerData {
 
     public static void handle(Supplier<MinecraftServer> server, ServerPlayer player, C2SRequestViewerData packet) {
         BlockEntity rawEntity = player.level.getBlockEntity(packet.blockPos);
-        if(rawEntity instanceof MinifyViewerBlockEntity blockEntity) {
+        if (rawEntity instanceof MinifyViewerBlockEntity blockEntity) {
             blockEntity.getOrGenerateWorldCache().ifPresent(cache ->
-                Services.NETWORK.sendToPlayer(new S2CSendViewerData(packet.blockPos, cache, blockEntity.getBlockEntityMap()), player)
+                Services.NETWORK.sendToPlayer(new S2CSendViewerData(packet.blockPos, Optional.empty(), cache, blockEntity.getBlockEntityMap()), player)
             );
         }
 
