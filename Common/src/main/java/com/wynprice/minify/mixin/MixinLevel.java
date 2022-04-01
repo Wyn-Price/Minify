@@ -1,5 +1,6 @@
 package com.wynprice.minify.mixin;
 
+import com.wynprice.minify.generation.DimensionRegistry;
 import com.wynprice.minify.management.MinifyChunkManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -15,40 +16,28 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(Level.class)
 public class MixinLevel {
 
-//    @Inject(
-//        method = "setBlock(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;II)Z",
-//        at = @At("RETURN")
-//    )
-//    public void setBlock(BlockPos pos, BlockState state, int flags, int recursions, CallbackInfoReturnable<Boolean> info) {
-//        if(info.getReturnValue()) {
-//            Level thiz = (Level) (Object) this;
-//            if(thiz instanceof ServerLevel) {
-//                MinifyChunkManager.getManager((ServerLevel) thiz).onBlockChangedAt(pos, state);
-//            }
-//        }
-//    }
-//
-//
-//    @Inject(
-//        method = "setBlockEntity(Lnet/minecraft/world/level/block/entity/BlockEntity;)V",
-//        at = @At("RETURN")
-//    )
-//    public void setBlockEntity(BlockEntity entity, CallbackInfo info) {
-//        Level thiz = (Level) (Object) this;
-//        if(thiz instanceof ServerLevel) {
-//            MinifyChunkManager.getManager((ServerLevel) thiz).onBlockChangedAt(entity.getBlockPos(), thiz.getBlockState(entity.getBlockPos()));
-//        }
-//    }
-//
-//
-//    @Inject(
-//        method = "removeBlockEntity(Lnet/minecraft/core/BlockPos;)V",
-//        at = @At("RETURN")
-//    )
-//    public void removeBlockEntity(BlockPos pos, CallbackInfo info) {
-//        Level thiz = (Level) (Object) this;
-//        if(thiz instanceof ServerLevel) {
-//            MinifyChunkManager.getManager((ServerLevel) thiz).onBlockChangedAt(pos, thiz.getBlockState(pos));
-//        }
-//    }
+    @Inject(
+        method = "getDayTime()J",
+        at = @At("RETURN"),
+        cancellable = true
+    )
+    private void getDayTime(CallbackInfoReturnable<Long> infoReturnable) {
+        var thiz = (Level) (Object) this;
+        if(thiz instanceof ServerLevel && thiz.dimension() == DimensionRegistry.WORLD_KEY) {
+            infoReturnable.setReturnValue(thiz.getServer().getLevel(Level.OVERWORLD).getDayTime());
+        }
+    }
+
+    @Inject(
+        method = "getGameTime()J",
+        at = @At("RETURN"),
+        cancellable = true
+    )
+    private void getGameTime(CallbackInfoReturnable<Long> infoReturnable) {
+        var thiz = (Level) (Object) this;
+        if(thiz instanceof ServerLevel && thiz.dimension() == DimensionRegistry.WORLD_KEY) {
+            infoReturnable.setReturnValue(thiz.getServer().getLevel(Level.OVERWORLD).getGameTime());
+        }
+    }
+
 }

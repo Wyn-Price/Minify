@@ -6,7 +6,8 @@
     "mixins": [
         "MixinLevel",
         "MixinLevelChunk",
-        "MixinServerLevel"
+        "MixinServerLevel",
+        "MixinBlockAndTintGetter"
     ],
     "client": [
         "MixinMinecraft",

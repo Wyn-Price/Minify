@@ -1,12 +1,14 @@
 package com.wynprice.minify.mixin;
 
+import com.wynprice.minify.generation.DimensionRegistry;
 import com.wynprice.minify.management.MinifyChunkManager;
+import com.wynprice.minify.management.MinifyLocationKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.BlockEventData;
+import net.minecraft.world.level.*;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import org.spongepowered.asm.mixin.Mixin;
@@ -19,7 +21,7 @@ import javax.annotation.Nullable;
 import java.util.function.BooleanSupplier;
 
 @Mixin(ServerLevel.class)
-public class MixinServerLevel {
+public abstract class MixinServerLevel implements BlockAndTintGetter {
 
     @Inject(
         method = "playSound(Lnet/minecraft/world/entity/player/Player;DDDLnet/minecraft/sounds/SoundEvent;Lnet/minecraft/sounds/SoundSource;FF)V",

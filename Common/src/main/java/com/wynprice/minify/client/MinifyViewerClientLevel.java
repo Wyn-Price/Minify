@@ -96,7 +96,7 @@ public class MinifyViewerClientLevel extends ClientLevel {
 
     @Override
     public int getBrightness(LightLayer layer, BlockPos pos) {
-        return Minecraft.getInstance().level.getBrightness(layer, pos);
+        return Minecraft.getInstance().level.getBrightness(layer, this.blockEntity.getBlockPos());
     }
 
     @Override
