@@ -39,16 +39,14 @@ public class MinifyViewerBlockEntityRenderer implements BlockEntityRenderer<Mini
     public void render(MinifyViewerBlockEntity blockEntity, float renderTicks, PoseStack stack, MultiBufferSource buffer, int light, int overlay) {
 
         MinifyViewerClientLevel viewer = MinifyViewerClientLevel.INSTANCE;
-        if(MinifyViewerClientLevel.INSTANCE == blockEntity.getLevel()) {
-            //Run when nested once
-            blockEntity.requestNestedClientIfNeeded();
-            viewer = MinifyViewerClientLevel.SECONDARY_INSTANCE;
-        } else if(MinifyViewerClientLevel.SECONDARY_INSTANCE != blockEntity.getLevel()) {
-            //Run when not nested
+        if(!viewer.hasRoom()) {
+            return;
+        }
+
+        if(viewer.getMainViewer() == null) {
             blockEntity.requestOnClientIfNeeded();
         } else {
-            //Run when nested twice
-            return;
+            blockEntity.requestNestedClientIfNeeded();
         }
 
         stack.pushPose();
@@ -58,9 +56,8 @@ public class MinifyViewerBlockEntityRenderer implements BlockEntityRenderer<Mini
         stack.translate(-0.5, -0.5, -0.5);
 
         stack.scale(1/8f, 1/8F, 1/8F);
-        MinifyViewerClientLevel finalViewer = viewer;
-        viewer.injectAndRun(blockEntity, () -> {
-            this.renderBlockAndFluid(finalViewer, stack, buffer);
+        viewer.injectAndRun(blockEntity, nested -> {
+            this.renderBlockAndFluid(viewer, stack, buffer, nested ? 16 : 0);
             blockEntity.getBlockEntityMap().forEach((pos, be) -> {
                 stack.pushPose();
                 stack.translate(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15);
@@ -74,21 +71,14 @@ public class MinifyViewerBlockEntityRenderer implements BlockEntityRenderer<Mini
     }
 
     //A modified version of ChunkRenderDispatcher#RebuildTask#compile
-    private void renderBlockAndFluid(MinifyViewerClientLevel level, PoseStack stack, MultiBufferSource source) {
+    private void renderBlockAndFluid(MinifyViewerClientLevel level, PoseStack stack, MultiBufferSource source, int offsetZ) {
         if (level != null) {
             ModelBlockRenderer.enableCaching();
             Random random = new Random();
             BlockRenderDispatcher blockRenderDispatcher = Minecraft.getInstance().getBlockRenderer();
 
-            for(BlockPos pos : BlockPos.betweenClosed(0, 0, 0, 7, 7, 7)) {
+            for(BlockPos pos : BlockPos.betweenClosed(0, 0, offsetZ, 7, 7, 7 + offsetZ)) {
                 BlockState state = level.getBlockState(pos);
-
-//                if (state.hasBlockEntity()) {
-//                    BlockEntity blockEntity = level.getBlockEntity(pos);
-//                    if (blockEntity != null) {
-//                        this.blockEntityRenderDispatcher.render(blockEntity, renderTicks, stack, source);
-//                    }
-//                }
 
                 FluidState fluidState = state.getFluidState();
                 if (!fluidState.isEmpty()) {

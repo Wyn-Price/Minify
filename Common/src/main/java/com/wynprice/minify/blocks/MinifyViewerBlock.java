@@ -24,9 +24,9 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
-public class MinificationViewerBlock extends BaseEntityBlock {
+public class MinifyViewerBlock extends BaseEntityBlock {
 
-    public MinificationViewerBlock(Properties properties) {
+    public MinifyViewerBlock(Properties properties) {
         super(properties);
     }
 

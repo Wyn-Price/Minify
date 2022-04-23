@@ -202,13 +202,15 @@ public class MinifyViewerBlockEntity extends BlockEntity {
     public void requestNestedClientIfNeeded() {
         if(!this.hasClientRequestedData && this.level instanceof MinifyViewerClientLevel minifyLevel) {
             this.hasClientRequestedData = true;
-            Services.NETWORK.sendToServer(new C2SRequestNestedData(minifyLevel.getCurrentBlockEntity().getBlockPos(), this.getBlockPos()));
+            Services.NETWORK.sendToServer(new C2SRequestNestedData(minifyLevel.getMainViewer().getBlockPos(), this.getBlockPos()));
         }
     }
 
     public static void clientTick(Level level, BlockPos pos, BlockState state, MinifyViewerBlockEntity blockEntity) {
-       MinifyViewerClientLevel.getIfPossible().ifPresent(mLevel ->
-           blockEntity.getOrGenerateWorldCache().ifPresent(cache -> mLevel.injectAndRun(blockEntity, mLevel::tickEntities))
-       );
+        MinifyViewerClientLevel mLevel = MinifyViewerClientLevel.INSTANCE;
+        //We only want to tick the "main" viewer
+        if(mLevel.getMainViewer() == null) {
+            blockEntity.getOrGenerateWorldCache().ifPresent(cache -> mLevel.injectAndRun(blockEntity, n -> mLevel.tickEntities()));
+        }
     }
 }

@@ -17,6 +17,5 @@ public class MixinMinecraft {
     )
     public void setLevel(ClientLevel level, CallbackInfo info) {
         MinifyViewerClientLevel.INSTANCE = new MinifyViewerClientLevel(level);
-        MinifyViewerClientLevel.SECONDARY_INSTANCE = new MinifyViewerClientLevel(level);
     }
 }

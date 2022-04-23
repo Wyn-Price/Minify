@@ -1,9 +1,11 @@
 package com.wynprice.minify.client;
 
+import com.wynprice.minify.Constants;
 import com.wynprice.minify.blocks.entity.MinifyViewerBlockEntity;
 import com.wynprice.minify.mixin.BiomeManagerAccessor;
 import com.wynprice.minify.platform.Services;
 import com.wynprice.minify.util.LevelChunkSectionAccessor;
+import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Option;
 import net.minecraft.client.multiplayer.ClientChunkCache;
@@ -17,30 +19,31 @@ import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.PalettedContainer;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.function.Consumer;
 
 public class MinifyViewerClientLevel extends ClientLevel {
 
     public static MinifyViewerClientLevel INSTANCE;
-    public static MinifyViewerClientLevel SECONDARY_INSTANCE;
 
-    public static Optional<MinifyViewerClientLevel> getIfPossible() {
-        if(INSTANCE.blockEntity == null) {
-            return Optional.of(INSTANCE);
-        }
-        if(SECONDARY_INSTANCE.blockEntity == null) {
-            return Optional.of(SECONDARY_INSTANCE);
-        }
-        return Optional.empty();
+
+    //The client can render/simulate a single nested viewer.
+    //In the future maybe make this configurable
+    private MinifyViewerBlockEntity mainViewer;
+    private MinifyViewerBlockEntity nestedViewer;
+
+    public boolean hasRoom() {
+        return this.mainViewer == null || this.nestedViewer == null;
     }
 
-    private MinifyViewerBlockEntity blockEntity;
 
     public MinifyViewerClientLevel(ClientLevel delegate) {
         super(null, delegate.getLevelData(), delegate.dimension(), delegate.dimensionTypeRegistration(), 2, 2, delegate.getProfilerSupplier(), null, false, ((BiomeManagerAccessor) delegate.getBiomeManager()).accessor_getBiomeZoomSeed());
@@ -49,12 +52,27 @@ public class MinifyViewerClientLevel extends ClientLevel {
         ClientChunkCache source = this.getChunkSource();
         AtomicReferenceArray<LevelChunk> chunks = Services.PLATFORM.getAccessor(source).accessor_chunks();
         chunks.set(0, new LevelChunk(this, new ChunkPos(0, 0)));
+        chunks.set(1, new LevelChunk(this, new ChunkPos(0, 1)));
     }
 
-    public void injectAndRun(MinifyViewerBlockEntity blockEntity, Runnable runner) {
-        this.blockEntity = blockEntity;
-        LevelChunk zeroChunk = this.getChunk(0, 0);
-        LevelChunkSection section = zeroChunk.getSection(this.getSectionIndex(0));
+    public void injectAndRun(MinifyViewerBlockEntity blockEntity, BooleanConsumer runner) {
+        boolean nested = false;
+        if(this.mainViewer != null) {
+            if(this.nestedViewer == null) {
+                nested = true;
+            } else {
+                Constants.LOG.trace("Exceeded number of nests on the client");
+            }
+        }
+
+        if(nested) {
+            this.nestedViewer = blockEntity;
+        } else {
+            this.mainViewer = blockEntity;
+        }
+
+        LevelChunk chunk = this.getChunk(0, nested ? 1 : 0);
+        LevelChunkSection section = chunk.getSection(this.getSectionIndex(0));
         LevelChunkSectionAccessor accessor = (LevelChunkSectionAccessor) section;
 
         //Make it so the chunk isn't empty, and is ticking.
@@ -65,38 +83,60 @@ public class MinifyViewerClientLevel extends ClientLevel {
 
         PalettedContainer<BlockState> states = section.getStates();
         accessor.accessor_setStates(blockEntity.getOrGenerateWorldCache().orElseThrow());
-        blockEntity.getBlockEntityMap().values().forEach(this::setBlockEntity);
+        if(nested) {
+            blockEntity.getBlockEntityMap().values().stream()
+                .map(BlockEntity::saveWithFullMetadata)
+                .map(nbt -> {
+                    BlockPos pos = BlockEntity.getPosFromTag(nbt).offset(0, 0, 16);
+                    return BlockEntity.loadStatic(pos, chunk.getBlockState(pos), nbt);
+                })
+                .filter(Objects::nonNull)
+                .forEach(this::setBlockEntity);
+        } else {
+            blockEntity.getBlockEntityMap().values().forEach(this::setBlockEntity);
+        }
 
-        runner.run();
+        runner.accept(nested);
 
         accessor.accessor_setStates(states);
 
         blockEntity.getBlockEntityMap().clear();
-        blockEntity.getBlockEntityMap().putAll(zeroChunk.getBlockEntities());
+        blockEntity.getBlockEntityMap().putAll(chunk.getBlockEntities());
         blockEntity.getBlockEntityMap().keySet().forEach(this::removeBlockEntity);
 
         accessor.accessor_setNonEmptyBlockCount((short) 0);
         accessor.accessor_setTickingBlockCount((short) 0);
         accessor.accessor_setTickingFluidCount((short) 0);
-        this.blockEntity = null;
+
+        if(nested) {
+            this.nestedViewer = null;
+        } else {
+            this.mainViewer = null;
+        }
+
     }
 
-    public MinifyViewerBlockEntity getCurrentBlockEntity() {
-        return blockEntity;
+    public MinifyViewerBlockEntity getCurrentBlockEntity(BlockPos pos) {
+        return pos.getZ() >= 16 ? this.nestedViewer : this.mainViewer;
+    }
+
+    public MinifyViewerBlockEntity getMainViewer() {
+        return mainViewer;
     }
 
     @Override
     public Holder<Biome> getBiome(BlockPos pos) {
         ClientLevel delegate = Minecraft.getInstance().level;
-        if(this.blockEntity != null) {
-            return delegate.getBiome(this.blockEntity.getBlockPos());
+        MinifyViewerBlockEntity blockEntity = this.getCurrentBlockEntity(pos);
+        if(blockEntity != null) {
+            return delegate.getBiome(blockEntity.getBlockPos());
         }
         return delegate.getBiome(pos);
     }
 
     @Override
     public int getBrightness(LightLayer layer, BlockPos pos) {
-        return Minecraft.getInstance().level.getBrightness(layer, this.blockEntity.getBlockPos());
+        return Minecraft.getInstance().level.getBrightness(layer, this.getCurrentBlockEntity(pos).getBlockPos());
     }
 
     @Override

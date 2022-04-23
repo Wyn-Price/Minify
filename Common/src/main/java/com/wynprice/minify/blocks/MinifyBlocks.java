@@ -17,9 +17,9 @@ public class MinifyBlocks {
     );
 
 
-    public static final MinificationViewerBlock MINIFY_VIEWER = create(
+    public static final MinifyViewerBlock MINIFY_VIEWER = create(
         "minify_viewer",
-        new MinificationViewerBlock(BlockBehaviour.Properties.of(Material.METAL).noOcclusion())
+        new MinifyViewerBlock(BlockBehaviour.Properties.of(Material.METAL).noOcclusion())
     );
 
     public static final WallRedstoneBlock MINIFY_CHUNK_WALL = create(

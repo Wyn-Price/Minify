@@ -28,8 +28,8 @@ public record S2CMinifiyBlockEvent(BlockPos viewerPos, BlockPos innerPos, int da
 
     public static void handle(Supplier<Minecraft> client, S2CMinifiyBlockEvent packet) {
         BlockEntity entityRaw = client.get().level.getBlockEntity(packet.viewerPos());
-        if(entityRaw instanceof MinifyViewerBlockEntity blockEntity) {
-            MinifyViewerClientLevel.INSTANCE.injectAndRun(blockEntity, () -> {
+        if(entityRaw instanceof MinifyViewerBlockEntity blockEntity && MinifyViewerClientLevel.INSTANCE.getMainViewer() == null) {
+            MinifyViewerClientLevel.INSTANCE.injectAndRun(blockEntity, nested -> {
                 BlockState blockState = MinifyViewerClientLevel.INSTANCE.getBlockState(packet.innerPos());
                 blockState.triggerEvent(MinifyViewerClientLevel.INSTANCE, packet.innerPos(), packet.dataA, packet.dataB);
             });
