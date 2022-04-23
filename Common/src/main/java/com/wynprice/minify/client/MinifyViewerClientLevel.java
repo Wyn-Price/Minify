@@ -52,7 +52,7 @@ public class MinifyViewerClientLevel extends ClientLevel {
         ClientChunkCache source = this.getChunkSource();
         AtomicReferenceArray<LevelChunk> chunks = Services.PLATFORM.getAccessor(source).accessor_chunks();
         chunks.set(0, new LevelChunk(this, new ChunkPos(0, 0)));
-        chunks.set(1, new LevelChunk(this, new ChunkPos(0, 1)));
+        chunks.set(1, new LevelChunk(this, new ChunkPos(1, 0)));
     }
 
     public void injectAndRun(MinifyViewerBlockEntity blockEntity, BooleanConsumer runner) {
@@ -71,7 +71,7 @@ public class MinifyViewerClientLevel extends ClientLevel {
             this.mainViewer = blockEntity;
         }
 
-        LevelChunk chunk = this.getChunk(0, nested ? 1 : 0);
+        LevelChunk chunk = this.getChunk(nested ? 1 : 0, 0);
         LevelChunkSection section = chunk.getSection(this.getSectionIndex(0));
         LevelChunkSectionAccessor accessor = (LevelChunkSectionAccessor) section;
 
@@ -87,7 +87,7 @@ public class MinifyViewerClientLevel extends ClientLevel {
             blockEntity.getBlockEntityMap().values().stream()
                 .map(BlockEntity::saveWithFullMetadata)
                 .map(nbt -> {
-                    BlockPos pos = BlockEntity.getPosFromTag(nbt).offset(0, 0, 16);
+                    BlockPos pos = BlockEntity.getPosFromTag(nbt).offset(16, 0, 0);
                     return BlockEntity.loadStatic(pos, chunk.getBlockState(pos), nbt);
                 })
                 .filter(Objects::nonNull)

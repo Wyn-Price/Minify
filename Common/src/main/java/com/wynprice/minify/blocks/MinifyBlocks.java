@@ -13,7 +13,7 @@ public class MinifyBlocks {
 
     public static final Block MINIFY_SOURCE = create(
         "minify_source",
-        new Block(BlockBehaviour.Properties.of(Material.METAL))
+        new MinifySourceBlock(BlockBehaviour.Properties.of(Material.METAL))
     );
 
 

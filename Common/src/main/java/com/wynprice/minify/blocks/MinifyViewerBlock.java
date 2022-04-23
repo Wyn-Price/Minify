@@ -53,7 +53,7 @@ public class MinifyViewerBlock extends BaseEntityBlock {
 
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        return level.isClientSide ? createTickerHelper(type, MinifyBlockEntityTypes.MINIFICATION_VIEWER_BLOCK_ENTITY, MinifyViewerBlockEntity::clientTick) : null;
+        return level.isClientSide ? createTickerHelper(type, MinifyBlockEntityTypes.MINIFY_VIEWER_BLOCK_ENTITY, MinifyViewerBlockEntity::clientTick) : null;
     }
 
     @Override
@@ -73,7 +73,9 @@ public class MinifyViewerBlock extends BaseEntityBlock {
     public void setPlacedBy(Level level, BlockPos pos, BlockState state, LivingEntity living, ItemStack stack) {
         BlockEntity entity = level.getBlockEntity(pos);
         if(entity instanceof MinifyViewerBlockEntity blockEntity) {
-           blockEntity.setHorizontalRotationIndex(living.getDirection().get2DDataValue());
+            int rot = living.getDirection().get2DDataValue();
+            blockEntity.setHorizontalRotationIndex(rot);
+            blockEntity.setPreviousHorizontalRotationIndex(rot);
            blockEntity.updateRedstoneWall();
         }
         super.setPlacedBy(level, pos, state, living, stack);

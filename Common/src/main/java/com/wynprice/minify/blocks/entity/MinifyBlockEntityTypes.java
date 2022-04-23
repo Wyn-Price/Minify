@@ -17,7 +17,8 @@ public class MinifyBlockEntityTypes {
 
     private static final List<Registered<BlockEntityType<?>>> TYPES = new ArrayList<>();
 
-    public static final BlockEntityType<MinifyViewerBlockEntity> MINIFICATION_VIEWER_BLOCK_ENTITY = create("minification_viewer_entity", Services.PLATFORM.createBlockEntity(MinifyViewerBlockEntity::new, MinifyBlocks.MINIFY_VIEWER));
+    public static final BlockEntityType<MinifyViewerBlockEntity> MINIFY_VIEWER_BLOCK_ENTITY = create("viewer", Services.PLATFORM.createBlockEntity(MinifyViewerBlockEntity::new, MinifyBlocks.MINIFY_VIEWER));
+    public static final BlockEntityType<MinifySourceBlockEntity> MINIFY_SOURCE_BLOCK_ENTITY = create("source", Services.PLATFORM.createBlockEntity(MinifySourceBlockEntity::new, MinifyBlocks.MINIFY_SOURCE));
 
     private static <T extends BlockEntity> BlockEntityType<T> create(String name, Function<Type<?>, BlockEntityType<T>> creator) {
         Type<?> type = Util.fetchChoiceType(References.BLOCK_ENTITY, name);

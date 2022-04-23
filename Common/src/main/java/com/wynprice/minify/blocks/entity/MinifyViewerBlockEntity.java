@@ -1,6 +1,5 @@
 package com.wynprice.minify.blocks.entity;
 
-import com.mojang.math.Quaternion;
 import com.wynprice.minify.client.MinifyViewerClientLevel;
 import com.wynprice.minify.generation.DimensionRegistry;
 import com.wynprice.minify.management.MinifyChunkManager;
@@ -50,7 +49,7 @@ public class MinifyViewerBlockEntity extends BlockEntity {
     private final Map<BlockPos, BlockEntity> blockEntityMap = new HashMap<>();
 
     public MinifyViewerBlockEntity(BlockPos pos, BlockState state) {
-        super(MinifyBlockEntityTypes.MINIFICATION_VIEWER_BLOCK_ENTITY, pos, state);
+        super(MinifyBlockEntityTypes.MINIFY_VIEWER_BLOCK_ENTITY, pos, state);
     }
 
     public void setSourceLocationKey(MinifySourceKey sourceLocationKey) {

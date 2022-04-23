@@ -2,17 +2,15 @@ package com.wynprice.minify;
 
 import com.wynprice.minify.blocks.MinifyBlocks;
 import com.wynprice.minify.blocks.entity.MinifyBlockEntityTypes;
-import com.wynprice.minify.blocks.entity.MinifyViewerBlockEntity;
+import com.wynprice.minify.client.MinifySourceBlockEntityRenderer;
 import com.wynprice.minify.client.MinifyViewerBlockEntityRenderer;
 import com.wynprice.minify.generation.DimensionRegistry;
-import com.wynprice.minify.generation.EmptyChunkGenerator;
 import com.wynprice.minify.items.CreativeTabHolder;
 import com.wynprice.minify.items.MinifyItems;
 import com.wynprice.minify.network.MinifyNetworkRegistry;
 import com.wynprice.minify.util.Registered;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
@@ -26,7 +24,6 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.IForgeRegistryEntry;
 
 import java.util.List;
@@ -71,7 +68,8 @@ public class Minify {
     }
 
     private static void registerBlockEntityRenders(EntityRenderersEvent.RegisterRenderers event) {
-        event.registerBlockEntityRenderer(MinifyBlockEntityTypes.MINIFICATION_VIEWER_BLOCK_ENTITY, MinifyViewerBlockEntityRenderer::new);
+        event.registerBlockEntityRenderer(MinifyBlockEntityTypes.MINIFY_VIEWER_BLOCK_ENTITY, MinifyViewerBlockEntityRenderer::new);
+        event.registerBlockEntityRenderer(MinifyBlockEntityTypes.MINIFY_SOURCE_BLOCK_ENTITY, c -> new MinifySourceBlockEntityRenderer());
     }
 
     private <T extends IForgeRegistryEntry<T>> void register(IEventBus modEventBus, Class<T> clazz, Supplier<List<Registered<T>>> list) {
