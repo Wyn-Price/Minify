@@ -58,7 +58,7 @@ public class MinifyViewerBlock extends BaseEntityBlock {
 
     @Override
     public RenderShape getRenderShape(BlockState state) {
-        return RenderShape.MODEL;
+        return RenderShape.INVISIBLE;
     }
 
     @Override
@@ -84,6 +84,7 @@ public class MinifyViewerBlock extends BaseEntityBlock {
         BlockEntity entity = level.getBlockEntity(pos);
         if(player.getItemInHand(hand).getItem() != MinifyItems.ITEM_SOURCE_TRANSFER && entity instanceof MinifyViewerBlockEntity blockEntity) {
             blockEntity.setHorizontalRotationIndex((blockEntity.getHorizontalRotationIndex() + 1) % 4);
+            blockEntity.updateRedstoneWall();
             return InteractionResult.SUCCESS;
         }
         return super.use(state, level, pos, player, hand, result);

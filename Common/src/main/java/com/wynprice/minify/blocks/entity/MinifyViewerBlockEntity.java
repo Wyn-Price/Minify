@@ -1,5 +1,6 @@
 package com.wynprice.minify.blocks.entity;
 
+import com.mojang.math.Quaternion;
 import com.wynprice.minify.client.MinifyViewerClientLevel;
 import com.wynprice.minify.generation.DimensionRegistry;
 import com.wynprice.minify.management.MinifyChunkManager;
@@ -35,6 +36,11 @@ public class MinifyViewerBlockEntity extends BlockEntity {
     //Do unlimited rotation, and don't want to have to deal with removing
     //state prop and replacing it with a index.
     private int horizontalRotationIndex = 0;
+    private int previousHorizontalRotationIndex = 0;
+
+    public static final int TICKS_TO_ROTATE = 3;
+    public int ticksToRotate;
+
     private int[] signalsInDirections = new int[Direction.values().length];
 
     private PalettedContainer<BlockState> worldCache;
@@ -79,8 +85,16 @@ public class MinifyViewerBlockEntity extends BlockEntity {
         this.horizontalRotationIndex = horizontalRotationIndex;
     }
 
+    public void setPreviousHorizontalRotationIndex(int previousHorizontalRotationIndex) {
+        this.previousHorizontalRotationIndex = previousHorizontalRotationIndex;
+    }
+
     public int getHorizontalRotationIndex() {
         return horizontalRotationIndex;
+    }
+
+    public int getPreviousHorizontalRotationIndex() {
+        return previousHorizontalRotationIndex;
     }
 
     @Override
@@ -211,6 +225,10 @@ public class MinifyViewerBlockEntity extends BlockEntity {
         //We only want to tick the "main" viewer
         if(mLevel.getMainViewer() == null) {
             blockEntity.getOrGenerateWorldCache().ifPresent(cache -> mLevel.injectAndRun(blockEntity, n -> mLevel.tickEntities()));
+        }
+        if(blockEntity.previousHorizontalRotationIndex != blockEntity.horizontalRotationIndex && blockEntity.ticksToRotate++ >= TICKS_TO_ROTATE) {
+            blockEntity.setPreviousHorizontalRotationIndex(blockEntity.getHorizontalRotationIndex());
+            blockEntity.ticksToRotate = 0;
         }
     }
 }

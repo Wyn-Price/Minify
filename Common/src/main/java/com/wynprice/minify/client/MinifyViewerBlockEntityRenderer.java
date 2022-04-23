@@ -19,6 +19,8 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
@@ -52,8 +54,24 @@ public class MinifyViewerBlockEntityRenderer implements BlockEntityRenderer<Mini
         stack.pushPose();
 
         stack.translate(0.5, 0.5, 0.5);
-        stack.mulPose(Vector3f.YP.rotationDegrees(90 * blockEntity.getHorizontalRotationIndex()));
+
+        int rotation = blockEntity.getHorizontalRotationIndex();
+        int previousRotation = blockEntity.getPreviousHorizontalRotationIndex();
+        if(rotation != previousRotation) {
+            //We can lerp between the previous, and the previous + 1
+            float change = (blockEntity.ticksToRotate + renderTicks - 1) / MinifyViewerBlockEntity.TICKS_TO_ROTATE;
+            stack.mulPose(Vector3f.YP.rotationDegrees(90 * (previousRotation + change)));
+        } else {
+            stack.mulPose(Vector3f.YP.rotationDegrees(90 * rotation));
+        }
+
         stack.translate(-0.5, -0.5, -0.5);
+
+        //Render the glass block
+        this.blockRenderDispatcher.renderBatched(
+            Blocks.GLASS.defaultBlockState(), blockEntity.getBlockPos(), Minecraft.getInstance().level, stack,
+            buffer.getBuffer(RenderType.cutout()), true, new Random()
+        );
 
         stack.scale(1/8f, 1/8F, 1/8F);
         viewer.injectAndRun(blockEntity, nested -> {
