@@ -74,9 +74,8 @@ public class MinifyViewerBlock extends BaseEntityBlock {
         BlockEntity entity = level.getBlockEntity(pos);
         if(entity instanceof MinifyViewerBlockEntity blockEntity) {
             int rot = living.getDirection().get2DDataValue();
-            blockEntity.setHorizontalRotationIndex(rot);
-            blockEntity.setPreviousHorizontalRotationIndex(rot);
-           blockEntity.updateRedstoneWall();
+            blockEntity.forceSetHorizontalRotationIndex(rot);
+            blockEntity.updateRedstoneWall();
         }
         super.setPlacedBy(level, pos, state, living, stack);
     }

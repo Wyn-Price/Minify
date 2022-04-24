@@ -3,6 +3,7 @@ package com.wynprice.minify.management;
 import com.wynprice.minify.Constants;
 import com.wynprice.minify.blocks.MinifyBlocks;
 import com.wynprice.minify.blocks.WallRedstoneBlock;
+import com.wynprice.minify.blocks.entity.MinifySourceBlockEntity;
 import com.wynprice.minify.blocks.entity.MinifyViewerBlockEntity;
 import com.wynprice.minify.generation.DimensionRegistry;
 import com.wynprice.minify.network.S2CMinifiyBlockEvent;
@@ -89,7 +90,9 @@ public class MinifyChunkManager extends SavedData {
 
     public void onUnloadViewer(MinifyLocationKey key) {
         this.viewers.remove(key);
-        boolean stillInUse = this.viewers.keySet().stream().anyMatch(k -> k.chunk().equals(key.chunk()));
+        boolean stillInUse = StreamSupport.stream(this.level.getServer().getAllLevels().spliterator(), false)
+            .flatMap(level -> MinifyChunkManager.getManager(level).viewers.keySet().stream())
+            .anyMatch(k -> k.chunk().equals(key.chunk()));
         if(!stillInUse) {
             this.setChunkForceLoaded(key.chunk(), false);
         }
@@ -136,6 +139,9 @@ public class MinifyChunkManager extends SavedData {
 
     private void setChunkForceLoaded(ChunkPos pos, boolean value) {
         ServerLevel dimension = this.level.getServer().getLevel(DimensionRegistry.WORLD_KEY);
+        if (dimension.getForcedChunks().contains(pos.toLong()) != value) {
+            Constants.LOG.debug((value ? "Began" : "Stopped") + " force loading chunk at " + pos);
+        }
         dimension.setChunkForced(pos.x, pos.z, value);
     }
 
@@ -262,6 +268,14 @@ public class MinifyChunkManager extends SavedData {
         return Optional.empty();
     }
 
+    public String getName(MinifySourceKey src) {
+        Optional<ServerLevel> levelOptional = this.findFromKey(src);
+        if(levelOptional.isPresent() && levelOptional.get().getBlockEntity(src.pos()) instanceof MinifySourceBlockEntity blockEntity) {
+            return blockEntity.getName();
+        }
+        return "";
+    }
+
     public void copyTo(MinifySourceKey src, MinifyLocationKey dest) {
         this.clearChunk(dest, false);
         Optional<ServerLevel> levelOptional = this.findFromKey(src);
@@ -295,6 +309,8 @@ public class MinifyChunkManager extends SavedData {
                     if(rawBlockEntity instanceof MinifyViewerBlockEntity blockEntity) {
                         //setSourceLocationKey will call this method (copyTo), hence recursively copying the data
                         stack.push(locationKey);
+                        blockEntity.forceSetHorizontalRotationIndex(minifyViewerBlock.getHorizontalRotationIndex());
+                        blockEntity.setName(minifyViewerBlock.getName());
                         blockEntity.setToData();
                         blockEntity.setSourceLocationKey(minifyViewerBlock.getSourceLocationKey());
                         stack.pop();
@@ -310,6 +326,7 @@ public class MinifyChunkManager extends SavedData {
                 dimension.setBlockEntity(blockEntity);
             }
         }
+
 
         isSilentlyPlacingIntoWorld.set(false);
 

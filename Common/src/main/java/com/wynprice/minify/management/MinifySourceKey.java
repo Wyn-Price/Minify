@@ -20,4 +20,8 @@ public record MinifySourceKey(ResourceLocation dimension, BlockPos pos) {
             NbtUtils.readBlockPos(tag.getCompound("position"))
         );
     }
+
+    public static boolean hasKey(CompoundTag tag) {
+        return tag.contains("dimension", 8) && tag.contains("position", 10);
+    }
 }

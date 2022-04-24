@@ -1,5 +1,6 @@
 package com.wynprice.minify.blocks.entity;
 
+import com.wynprice.minify.client.BaseMinifyBlockEntity;
 import com.wynprice.minify.client.MinifyViewerClientLevel;
 import com.wynprice.minify.generation.DimensionRegistry;
 import com.wynprice.minify.management.MinifyChunkManager;
@@ -12,9 +13,6 @@ import com.wynprice.minify.platform.Services;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -23,9 +21,11 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.PalettedContainer;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
-public class MinifyViewerBlockEntity extends BlockEntity {
+public class MinifyViewerBlockEntity extends BaseMinifyBlockEntity {
 
     private MinifyLocationKey locationKey;
     private MinifySourceKey sourceLocationKey;
@@ -39,6 +39,8 @@ public class MinifyViewerBlockEntity extends BlockEntity {
 
     public static final int TICKS_TO_ROTATE = 3;
     public int ticksToRotate;
+
+    private boolean skipRotate = true;
 
     private int[] signalsInDirections = new int[Direction.values().length];
 
@@ -56,7 +58,11 @@ public class MinifyViewerBlockEntity extends BlockEntity {
         this.sourceLocationKey = sourceLocationKey;
         this.setChanged();
         if (this.level instanceof ServerLevel serverLevel) {
-            MinifyChunkManager.getManager(serverLevel).copyTo(sourceLocationKey, this.locationKey);
+            MinifyChunkManager manager = MinifyChunkManager.getManager(serverLevel);
+            manager.copyTo(sourceLocationKey, this.locationKey);
+            this.setName(manager.getName(sourceLocationKey));
+            level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
+
 
             //Refresh the world cache, then send it to the client
             if(this.worldCache != null) {
@@ -82,10 +88,18 @@ public class MinifyViewerBlockEntity extends BlockEntity {
 
     public void setHorizontalRotationIndex(int horizontalRotationIndex) {
         this.horizontalRotationIndex = horizontalRotationIndex;
+        this.setChanged();
     }
 
     public void setPreviousHorizontalRotationIndex(int previousHorizontalRotationIndex) {
         this.previousHorizontalRotationIndex = previousHorizontalRotationIndex;
+        this.setChanged();
+    }
+
+
+    public void forceSetHorizontalRotationIndex(int index) {
+        this.setHorizontalRotationIndex(index);
+        this.setPreviousHorizontalRotationIndex(index);
     }
 
     public int getHorizontalRotationIndex() {
@@ -96,14 +110,14 @@ public class MinifyViewerBlockEntity extends BlockEntity {
         return previousHorizontalRotationIndex;
     }
 
-    @Override
-    public Packet<ClientGamePacketListener> getUpdatePacket() {
-        return ClientboundBlockEntityDataPacket.create(this);
-    }
-
-    @Override
-    public CompoundTag getUpdateTag() {
-        return this.saveWithoutMetadata();
+    public float getRotationDegrees(float renderTicks) {
+        if(this.horizontalRotationIndex != this.previousHorizontalRotationIndex && !this.skipRotate) {
+            //We can lerp between the previous, and the previous + 1
+            float change = (this.ticksToRotate + renderTicks - 1) / MinifyViewerBlockEntity.TICKS_TO_ROTATE;
+            return 90 * (this.previousHorizontalRotationIndex + change);
+        } else {
+            return 90 * this.horizontalRotationIndex;
+        }
     }
 
     public void setToData() {
@@ -225,9 +239,10 @@ public class MinifyViewerBlockEntity extends BlockEntity {
         if(mLevel.getMainViewer() == null) {
             blockEntity.getOrGenerateWorldCache().ifPresent(cache -> mLevel.injectAndRun(blockEntity, n -> mLevel.tickEntities()));
         }
-        if(blockEntity.previousHorizontalRotationIndex != blockEntity.horizontalRotationIndex && blockEntity.ticksToRotate++ >= TICKS_TO_ROTATE) {
+        if(blockEntity.skipRotate || (blockEntity.previousHorizontalRotationIndex != blockEntity.horizontalRotationIndex && blockEntity.ticksToRotate++ >= TICKS_TO_ROTATE)) {
             blockEntity.setPreviousHorizontalRotationIndex(blockEntity.getHorizontalRotationIndex());
             blockEntity.ticksToRotate = 0;
+            blockEntity.skipRotate = false;
         }
     }
 }

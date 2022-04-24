@@ -2,6 +2,7 @@ package com.wynprice.minify.client;
 
 import com.mojang.blaze3d.vertex.*;
 import com.mojang.math.Matrix4f;
+import com.mojang.math.Quaternion;
 import com.mojang.math.Vector3f;
 import com.wynprice.minify.blocks.entity.MinifyViewerBlockEntity;
 import net.minecraft.CrashReport;
@@ -44,34 +45,28 @@ public class MinifyViewerBlockEntityRenderer implements BlockEntityRenderer<Mini
 
     @Override
     public void render(MinifyViewerBlockEntity blockEntity, float renderTicks, PoseStack stack, MultiBufferSource buffer, int light, int overlay) {
-
         MinifyViewerClientLevel viewer = MinifyViewerClientLevel.INSTANCE;
         if(!viewer.hasRoom()) {
             return;
         }
 
+        boolean nested;
         if(viewer.getMainViewer() == null) {
+            nested = false;
             blockEntity.requestOnClientIfNeeded();
         } else {
+            nested = true;
             blockEntity.requestNestedClientIfNeeded();
         }
+
+        //Multiply by the parents inverse to get the correct rotation
+        Quaternion parentInvRotation = nested ? Vector3f.YP.rotationDegrees(-viewer.getMainViewer().getRotationDegrees(renderTicks)) : null;
+        MinifySourceBlockEntityRenderer.renderNameOverBlock(stack, buffer, blockEntity.getName(), parentInvRotation);
 
         stack.pushPose();
 
         stack.translate(0.5, 0.5, 0.5);
-
-        int rotation = blockEntity.getHorizontalRotationIndex();
-        int previousRotation = blockEntity.getPreviousHorizontalRotationIndex();
-
-        Matrix4f pose = stack.last().pose();
-        if(rotation != previousRotation) {
-            //We can lerp between the previous, and the previous + 1
-            float change = (blockEntity.ticksToRotate + renderTicks - 1) / MinifyViewerBlockEntity.TICKS_TO_ROTATE;
-            pose.multiply(Vector3f.YP.rotationDegrees(90 * (previousRotation + change)));
-        } else {
-            pose.multiply(Vector3f.YP.rotationDegrees(90 * rotation));
-        }
-
+        stack.mulPose(Vector3f.YP.rotationDegrees(blockEntity.getRotationDegrees(renderTicks)));
         stack.translate(-0.5, -0.5, -0.5);
 
         //Render the glass block
@@ -80,9 +75,10 @@ public class MinifyViewerBlockEntityRenderer implements BlockEntityRenderer<Mini
             buffer.getBuffer(RenderType.cutout()), true, new Random()
         );
 
+
         stack.scale(1/8f, 1/8F, 1/8F);
-        viewer.injectAndRun(blockEntity, nested -> {
-            this.renderBlockAndFluid(viewer, stack, buffer, nested ? 16 : 0);
+        viewer.injectAndRun(blockEntity, isNested -> {
+            this.renderBlockAndFluid(viewer, stack, buffer, isNested ? 16 : 0);
             blockEntity.getBlockEntityMap().forEach((pos, be) -> {
                 stack.pushPose();
                 stack.translate(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15);

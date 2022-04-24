@@ -2,6 +2,7 @@ package com.wynprice.minify.blocks;
 
 import com.wynprice.minify.util.Registered;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.Material;
 
@@ -19,7 +20,7 @@ public class MinifyBlocks {
 
     public static final MinifyViewerBlock MINIFY_VIEWER = create(
         "minify_viewer",
-        new MinifyViewerBlock(BlockBehaviour.Properties.of(Material.METAL).noOcclusion())
+        new MinifyViewerBlock(BlockBehaviour.Properties.of(Material.METAL).noOcclusion().isRedstoneConductor((var1, var2, var3) -> false))
     );
 
     public static final WallRedstoneBlock MINIFY_CHUNK_WALL = create(
